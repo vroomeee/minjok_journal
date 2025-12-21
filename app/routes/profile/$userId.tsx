@@ -5,12 +5,10 @@ import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { Link } from "react-router";
 
-// Server-side loader to fetch user profile and their papers
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { userId } = params;
 
-  // Get current user (optional)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -25,154 +23,143 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     currentUserProfile = data;
   }
 
-  // Fetch profile of the page owner
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", userId)
     .single();
 
-  if (error || !profile) {
-    throw new Response("Profile not found", { status: 404 });
-  }
+  if (error || !profile) throw new Response("Profile not found", { status: 404 });
 
-  // Fetch papers authored by this user
   const { data: papers } = await supabase
     .from("articles")
     .select("*")
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
-  return {
-    profile,
-    papers: papers || [],
-    user,
-    currentUserProfile,
-  };
+  return { user, currentUserProfile, profile, papers: papers || [] };
 }
 
-// Server-side action to delete user (admin only)
 export async function action({ request, params }: Route.ActionArgs) {
-  const { userId } = params;
-  const { user, profile } = await getUserProfile(request);
-
-  // Check if user is admin
-  if (profile.admin_type !== "admin") {
-    throw new Response("Unauthorized: Admin access required", { status: 403 });
-  }
-
+  const { user } = await getUserProfile(request);
   const { supabase } = createSupabaseServerClient(request);
+  const { userId } = params;
 
-  // Delete user from auth.users (cascades to profiles and related data)
-  const { error } = await supabase.auth.admin.deleteUser(userId);
-
-  if (error) {
-    return { error: "Failed to delete user account" };
+  if (user.id !== userId) {
+    throw new Response("Unauthorized", { status: 403 });
   }
 
-  return redirect("/");
+  const formData = await request.formData();
+  const fullName = formData.get("full_name") as string;
+  const intro = formData.get("intro") as string;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ full_name: fullName, intro })
+    .eq("id", userId);
+
+  if (error) return { error: "Failed to update profile" };
+  return redirect(`/profile/${userId}`);
 }
 
-export default function Profile() {
-  const { profile, papers, user, currentUserProfile } =
-    useLoaderData<typeof loader>();
+export default function ProfilePage() {
+  const { user, currentUserProfile, profile, papers } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-
   const isOwnProfile = user?.id === profile.id;
-  const isAdmin = currentUserProfile?.admin_type === "admin";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="page">
       <Nav user={user || undefined} profile={currentUserProfile || undefined} />
 
-      <div className="container mx-auto px-4 py-8">
-        {actionData?.error && (
-          <div className="mb-4 rounded-md bg-red-50 p-4">
-            <p className="text-sm text-red-800">{actionData.error}</p>
-          </div>
-        )}
-
-        {/* Profile header */}
-        <div className="bg-white rounded-lg shadow p-8 mb-6">
-          <div className="flex justify-between items-start">
+      <div className="page-body">
+        <div className="section">
+          <div className="row" style={{ justifyContent: "space-between" }}>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {profile.full_name || profile.username}
+              <h1 style={{ fontSize: 22, margin: 0 }}>
+                {profile.full_name || profile.username || "Unnamed User"}
               </h1>
-              {profile.username && profile.full_name && (
-                <p className="text-gray-600 mb-4">@{profile.username}</p>
-              )}
-
-              <div className="flex items-center space-x-3 mb-4">
-                <RoleBadge role={profile.role_type} />
-                {profile.admin_type === "admin" && (
-                  <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500 text-white">
-                    Admin
-                  </span>
-                )}
+              <div className="row" style={{ gap: 8, marginTop: 4 }}>
+                <span className="muted">{profile.username || profile.id}</span>
+                {profile.role_type && <RoleBadge role={profile.role_type} />}
               </div>
-
-              {profile.intro && (
-                <p className="text-gray-700 max-w-2xl">{profile.intro}</p>
-              )}
             </div>
-
-            {isAdmin && !isOwnProfile && (
-              <Form method="post">
-                <button
-                  type="submit"
-                  onClick={(e) =>
-                    !confirm(
-                      "Are you sure you want to delete this user account? This action cannot be undone."
-                    ) && e.preventDefault()
-                  }
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                >
-                  Delete User
-                </button>
-              </Form>
-            )}
           </div>
+
+          {profile.intro && (
+            <p className="muted" style={{ marginTop: 8 }}>
+              {profile.intro}
+            </p>
+          )}
+
+          {actionData?.error && (
+            <div className="section-compact subtle" style={{ marginTop: 10 }}>
+              <p className="text-sm" style={{ color: "#f6b8bd" }}>
+                {actionData.error}
+              </p>
+            </div>
+          )}
+
+          {isOwnProfile && (
+            <div className="section-compact" style={{ marginTop: 10 }}>
+              <h3 style={{ fontSize: 16, margin: "0 0 6px" }}>Edit Profile</h3>
+              <Form method="post" className="list">
+                <div>
+                  <label className="label">Full Name</label>
+                  <input
+                    type="text"
+                    name="full_name"
+                    defaultValue={profile.full_name || ""}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Intro</label>
+                  <textarea
+                    name="intro"
+                    rows={3}
+                    className="textarea"
+                    defaultValue={profile.intro || ""}
+                  />
+                </div>
+                <div className="row">
+                  <button type="submit" className="btn btn-accent">
+                    Save
+                  </button>
+                </div>
+              </Form>
+            </div>
+          )}
         </div>
 
-        {/* User's papers */}
-        <div className="bg-white rounded-lg shadow p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            {isOwnProfile ? "My Papers" : "Papers"}
-          </h2>
-
+        <div className="section">
+          <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+            <h2 style={{ fontSize: 18, margin: 0 }}>Papers</h2>
+            {isOwnProfile && (
+              <Link to="/papers/new" className="btn btn-ghost">
+                New Paper
+              </Link>
+            )}
+          </div>
           {papers.length === 0 ? (
-            <p className="text-gray-500">No papers submitted yet.</p>
+            <p className="muted" style={{ margin: 0 }}>
+              No papers yet.
+            </p>
           ) : (
-            <div className="grid gap-4">
+            <div className="card-grid">
               {papers.map((paper) => (
-                <div
-                  key={paper.id}
-                  className="border rounded-lg p-4 hover:border-blue-500 transition"
-                >
-                  <div className="flex justify-between items-start">
+                <div key={paper.id} className="section-compact">
+                  <div className="row" style={{ justifyContent: "space-between" }}>
                     <div>
-                      <Link
-                        to={`/papers/${paper.id}`}
-                        className="text-lg font-semibold text-gray-900 hover:text-blue-600"
-                      >
-                        {paper.title}
+                      <Link to={`/papers/${paper.id}`} className="nav-link" style={{ padding: 0 }}>
+                        <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>
+                          {paper.title}
+                        </h3>
                       </Link>
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="muted" style={{ margin: "2px 0" }}>
                         {new Date(paper.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        paper.status === "published"
-                          ? "bg-green-100 text-green-800"
-                          : paper.status === "in_review"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {paper.status}
-                    </span>
+                    <span className="pill">{paper.status}</span>
                   </div>
                 </div>
               ))}

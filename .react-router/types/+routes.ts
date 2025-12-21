@@ -67,6 +67,9 @@ type Pages = {
   "/qna": {
     params: {};
   };
+  "/qna/new": {
+    params: {};
+  };
   "/board": {
     params: {};
   };
@@ -83,7 +86,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/board" | "/board/new" | "/board/:postId";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/qna/new" | "/board" | "/board/new" | "/board/:postId";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -145,6 +148,10 @@ type RouteFiles = {
     id: "routes/qna";
     page: "/qna";
   };
+  "routes/qna/new.tsx": {
+    id: "routes/qna/new";
+    page: "/qna/new";
+  };
   "routes/board.tsx": {
     id: "routes/board";
     page: "/board";
@@ -176,6 +183,7 @@ type RouteModules = {
   "routes/review": typeof import("./app/routes/review.tsx");
   "routes/profile/$userId": typeof import("./app/routes/profile/$userId.tsx");
   "routes/qna": typeof import("./app/routes/qna.tsx");
+  "routes/qna/new": typeof import("./app/routes/qna/new.tsx");
   "routes/board": typeof import("./app/routes/board.tsx");
   "routes/board/new": typeof import("./app/routes/board/new.tsx");
   "routes/board/$postId": typeof import("./app/routes/board/$postId.tsx");

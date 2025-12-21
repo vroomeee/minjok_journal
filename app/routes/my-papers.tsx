@@ -2,23 +2,30 @@ import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/my-papers";
 import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
+import { RoleBadge } from "~/components/role-badge";
 
-// Server-side loader - require authentication
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
 
-  // Fetch current user's profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .single();
 
-  // Fetch user's papers
   const { data: papers } = await supabase
     .from("articles")
-    .select("*")
+    .select(
+      `
+      *,
+      versions:article_versions!article_versions_article_id_fkey (
+        id,
+        version_number,
+        created_at
+      )
+    `
+    )
     .eq("author_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -29,73 +36,52 @@ export default function MyPapers() {
   const { papers, user, profile } = useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="page">
       <Nav user={user} profile={profile || undefined} />
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Papers</h1>
-          <Link
-            to="/papers/new"
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Submit New Paper
-          </Link>
+      <div className="page-body">
+        <div className="section">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>
+              <h1 style={{ fontSize: 22, margin: 0 }}>My Papers</h1>
+              <p className="muted" style={{ margin: 0 }}>
+                Manage your submissions.
+              </p>
+            </div>
+            <Link to="/papers/new" className="btn btn-accent">
+              New Paper
+            </Link>
+          </div>
         </div>
 
         {papers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-500 mb-4">
-              You haven't submitted any papers yet.
+          <div className="section">
+            <p className="muted" style={{ margin: 0 }}>
+              No papers yet.
             </p>
-            <Link
-              to="/papers/new"
-              className="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-            >
-              Submit Your First Paper
-            </Link>
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="card-grid">
             {papers.map((paper) => (
-              <div
-                key={paper.id}
-                className="bg-white rounded-lg shadow hover:shadow-md transition p-6"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <Link
-                      to={`/papers/${paper.id}`}
-                      className="text-xl font-semibold text-gray-900 hover:text-blue-600"
-                    >
-                      {paper.title}
+              <div key={paper.id} className="section-compact">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>
+                    <Link to={`/papers/${paper.id}`} className="nav-link" style={{ padding: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>
+                        {paper.title}
+                      </h3>
                     </Link>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Created: {new Date(paper.created_at).toLocaleDateString()}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Last updated: {new Date(paper.updated_at).toLocaleDateString()}
-                    </p>
+                    <div className="row" style={{ gap: 8, marginTop: 4 }}>
+                      <span className="muted" style={{ fontSize: 13 }}>
+                        Status: {paper.status}
+                      </span>
+                      {profile && <RoleBadge role={profile.role_type} />}
+                      <span className="muted" style={{ fontSize: 13 }}>
+                        {new Date(paper.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end space-y-2">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        paper.status === "published"
-                          ? "bg-green-100 text-green-800"
-                          : paper.status === "in_review"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {paper.status}
-                    </span>
-                    <Link
-                      to={`/papers/${paper.id}`}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                    >
-                      Manage
-                    </Link>
-                  </div>
+                  <span className="pill">{paper.status}</span>
                 </div>
               </div>
             ))}

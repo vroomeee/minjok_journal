@@ -4,11 +4,9 @@ import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 
-// Server-side loader to fetch papers in review
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
-  // Get current user (optional)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -23,7 +21,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     profile = data;
   }
 
-  // Fetch papers with status "in_review"
   const { data: papers } = await supabase
     .from("articles")
     .select(
@@ -48,60 +45,62 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { papers: papers || [], user, profile };
 }
 
-export default function Review() {
+export default function ReviewQueue() {
   const { papers, user, profile } = useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="page">
       <Nav user={user || undefined} profile={profile || undefined} />
-
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Paper Review Queue
-        </h1>
+      <div className="page-body">
+        <div className="section">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>
+              <h1 style={{ fontSize: 22, margin: 0 }}>Review Queue</h1>
+              <p className="muted" style={{ margin: 0 }}>
+                Papers awaiting review.
+              </p>
+            </div>
+          </div>
+        </div>
 
         {papers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-500">No papers in review at the moment.</p>
+          <div className="section">
+            <p className="muted" style={{ margin: 0 }}>
+              No papers in review.
+            </p>
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="card-grid">
             {papers.map((paper) => (
-              <div
-                key={paper.id}
-                className="bg-white rounded-lg shadow hover:shadow-md transition p-6"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <Link
-                      to={`/papers/${paper.id}`}
-                      className="text-xl font-semibold text-gray-900 hover:text-blue-600"
-                    >
-                      {paper.title}
+              <div key={paper.id} className="section-compact">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>
+                    <Link to={`/papers/${paper.id}`} className="nav-link" style={{ padding: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>
+                        {paper.title}
+                      </h3>
                     </Link>
-                    <div className="mt-2 flex items-center space-x-4">
-                      <span className="text-sm text-gray-600">
+                    <div className="row" style={{ gap: 8, marginTop: 4 }}>
+                      <span className="muted" style={{ fontSize: 13 }}>
                         by {paper.author?.username || paper.author?.full_name}
                       </span>
-                      {paper.author && (
-                        <RoleBadge role={paper.author.role_type} />
-                      )}
-                      <span className="text-sm text-gray-500">
+                      {paper.author && <RoleBadge role={paper.author.role_type} />}
+                      <span className="muted" style={{ fontSize: 13 }}>
                         Submitted: {new Date(paper.updated_at).toLocaleDateString()}
                       </span>
                     </div>
                     {paper.current_version && (
-                      <div className="mt-3">
+                      <div style={{ marginTop: 6 }}>
                         <Link
                           to={`/papers/${paper.id}/versions/${paper.current_version.id}`}
-                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                          className="btn btn-ghost"
                         >
                           Review Version {paper.current_version.version_number}
                         </Link>
                       </div>
                     )}
                   </div>
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                  <span className="pill" style={{ background: "#2f2a17" }}>
                     In Review
                   </span>
                 </div>

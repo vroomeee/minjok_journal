@@ -29,6 +29,7 @@ export default [
 
   // Community routes
   route("qna", "routes/qna.tsx"),
+  route("qna/new", "routes/qna/new.tsx"),
   route("board", "routes/board.tsx"),
   route("board/new", "routes/board/new.tsx"),
   route("board/:postId", "routes/board/$postId.tsx"),

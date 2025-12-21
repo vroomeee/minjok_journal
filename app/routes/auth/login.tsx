@@ -1,22 +1,18 @@
 import { Form, Link, redirect, useActionData } from "react-router";
 import type { Route } from "./+types/login";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { Nav } from "~/components/nav";
 
-// Server-side action for login
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
   const { supabase, headers } = createSupabaseServerClient(request);
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: error.message };
+    return { error: error.message || "Failed to sign in", headers };
   }
 
   return redirect("/", { headers });
@@ -26,70 +22,42 @@ export default function Login() {
   const actionData = useActionData<typeof action>();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to 민족 Journal
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{" "}
-            <Link
-              to="/auth/signup"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              create a new account
-            </Link>
+    <div className="page">
+      <Nav />
+      <div className="page-body" style={{ maxWidth: 480 }}>
+        <div className="section">
+          <h1 style={{ fontSize: 22, marginBottom: 6 }}>Sign In</h1>
+          <p className="muted" style={{ marginBottom: 12 }}>
+            Access your account.
           </p>
-        </div>
 
-        <Form method="post" className="mt-8 space-y-6">
           {actionData?.error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{actionData.error}</p>
+            <div className="section-compact subtle" style={{ marginBottom: 10 }}>
+              <p className="text-sm" style={{ color: "#f6b8bd" }}>
+                {actionData.error}
+              </p>
             </div>
           )}
 
-          <div className="rounded-md shadow-sm -space-y-px">
+          <Form method="post" className="list">
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-              />
+              <label className="label">Email</label>
+              <input type="email" name="email" required className="input" />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-              />
+              <label className="label">Password</label>
+              <input type="password" name="password" required className="input" />
             </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Sign in
-            </button>
-          </div>
-        </Form>
+            <div className="row">
+              <button type="submit" className="btn btn-accent">
+                Sign In
+              </button>
+              <Link to="/auth/signup" className="btn btn-ghost">
+                Create account
+              </Link>
+            </div>
+          </Form>
+        </div>
       </div>
     </div>
   );

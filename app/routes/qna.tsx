@@ -17,7 +17,6 @@ import { useEffect, useRef } from "react";
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
-  // Get current user (optional)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -32,7 +31,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     profile = data;
   }
 
-  // Fetch all questions with authors
   const { data: questions } = await supabase
     .from("qna_questions")
     .select(
@@ -48,7 +46,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     )
     .order("created_at", { ascending: false });
 
-  // Fetch all replies
   const questionIds = questions?.map((q) => q.id) || [];
   let replies: any[] = [];
   if (questionIds.length > 0) {
@@ -74,7 +71,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { questions: questions || [], replies, user, profile };
 }
 
-// Server-side action - create question or reply, delete question or reply
+// Server-side action - create reply, delete question or reply
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
@@ -82,7 +79,6 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  // Check if user is admin
   const { data: profile } = await supabase
     .from("profiles")
     .select("admin_type, role_type")
@@ -91,102 +87,49 @@ export async function action({ request }: Route.ActionArgs) {
 
   const isAdmin = profile?.admin_type === "admin";
 
-  if (intent === "askQuestion") {
-    const title = formData.get("title") as string;
-    const content = formData.get("content") as string;
-
-    if (!title || !content) {
-      return { error: "Title and content are required" };
-    }
-
-    const { error } = await supabase.from("qna_questions").insert({
-      title,
-      content,
-      author_id: user.id,
-    });
-
-    if (error) {
-      return { error: "Failed to post question" };
-    }
-
-    return { success: true };
-  }
-
   if (intent === "replyToQuestion") {
-    // Check if user is a mentor
     if (!profile || profile.role_type !== "mentor") {
       return { error: "Only mentors can reply to questions" };
     }
-
     const questionId = formData.get("questionId") as string;
     const content = formData.get("content") as string;
-
-    if (!content) {
-      return { error: "Reply content is required" };
-    }
-
+    if (!content) return { error: "Reply content is required" };
     const { error } = await supabase.from("qna_replies").insert({
       question_id: questionId,
       author_id: user.id,
       content,
     });
-
-    if (error) {
-      return { error: "Failed to post reply" };
-    }
-
+    if (error) return { error: "Failed to post reply" };
     return { success: true };
   }
 
   if (intent === "deleteQuestion") {
     const questionId = formData.get("questionId") as string;
-
-    // Get question to check ownership
     const { data: question } = await supabase
       .from("qna_questions")
       .select("author_id")
       .eq("id", questionId)
       .single();
-
     if (!question || (question.author_id !== user.id && !isAdmin)) {
       return { error: "Unauthorized to delete this question" };
     }
-
-    const { error } = await supabase
-      .from("qna_questions")
-      .delete()
-      .eq("id", questionId);
-
-    if (error) {
-      return { error: "Failed to delete question" };
-    }
-
+    const { error } = await supabase.from("qna_questions").delete().eq("id", questionId);
+    if (error) return { error: "Failed to delete question" };
     return { success: true };
   }
 
   if (intent === "deleteReply") {
     const replyId = formData.get("replyId") as string;
-
-    // Get reply to check ownership
     const { data: reply } = await supabase
       .from("qna_replies")
       .select("author_id")
       .eq("id", replyId)
       .single();
-
     if (!reply || (reply.author_id !== user.id && !isAdmin)) {
       return { error: "Unauthorized to delete this reply" };
     }
-
-    const { error } = await supabase
-      .from("qna_replies")
-      .delete()
-      .eq("id", replyId);
-
-    if (error) {
-      return { error: "Failed to delete reply" };
-    }
-
+    const { error } = await supabase.from("qna_replies").delete().eq("id", replyId);
+    if (error) return { error: "Failed to delete reply" };
     return { success: true };
   }
 
@@ -201,240 +144,165 @@ export default function QnA() {
   const { questions, replies, user, profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
-  // Reset form and revalidate data when action succeeds
   useEffect(() => {
     if (actionData?.success && navigation.state === "idle") {
-      // reset Ask Question form
       questionFormRef.current?.reset();
-
-      // reset all Answer forms
-      Object.values(answerFormRefs.current).forEach((form) => form?.reset());
-
       revalidator.revalidate();
     }
   }, [actionData, navigation.state, revalidator]);
 
-  const answerFormRefs = useRef<Record<string, HTMLFormElement | null>>({});
-
   const isMentor = profile?.role_type === "mentor";
   const isAdmin = profile?.admin_type === "admin";
+
   const truncateTitle = (title: string) =>
     title.length > 20 ? `${title.slice(0, 20)}...` : title;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="page">
       <Nav user={user || undefined} profile={profile || undefined} />
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Q&A</h1>
+      <div className="page-body">
+        <div className="section">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>
+              <h1 style={{ fontSize: 22, margin: 0 }}>Q&A</h1>
+              <p className="muted" style={{ margin: 0 }}>
+                Ask questions and get mentor feedback.
+              </p>
+            </div>
+          </div>
         </div>
 
         {actionData?.error && (
-          <div className="mb-4 rounded-md bg-red-50 p-4">
-            <p className="text-sm text-red-800">{actionData.error}</p>
+          <div className="section-compact subtle">
+            <p className="text-sm" style={{ color: "#f6b8bd" }}>
+              {actionData.error}
+            </p>
           </div>
         )}
 
-        {/* Ask question form */}
         {user && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Ask a Question
-            </h2>
-            <Form method="post" className="space-y-4" ref={questionFormRef}>
-              <input type="hidden" name="intent" value="askQuestion" />
-              <div>
-                <input
-                  type="text"
-                  name="title"
-                  placeholder="Question title"
-                  required
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
-                />
-              </div>
-              <div>
-                <textarea
-                  name="content"
-                  rows={3}
-                  placeholder="Describe your question..."
-                  required
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
-                />
-              </div>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Post Question
-              </button>
-            </Form>
+          <div className="section">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <h2 style={{ fontSize: 18, margin: 0 }}>Ask a Question</h2>
+              <Link to="/qna/new" className="btn btn-accent">
+                Go to Ask Page
+              </Link>
+            </div>
           </div>
         )}
 
-        {/* Questions list */}
-        <div className="space-y-6">
+        <div className="card-grid">
           {questions.map((question) => {
-            const questionReplies = replies.filter(
-              (r) => r.question_id === question.id
-            );
+            const questionReplies = replies.filter((r) => r.question_id === question.id);
 
             return (
-              <details
-                key={question.id}
-                className="bg-white rounded-lg shadow p-6"
-              >
-                <summary className="text-xl cursor-pointer list-none pr-6 py-1 flex justify-between items-center hover:bg-gray-50">
-                  <span className="font-medium text-gray-900">
-                    {truncateTitle(question.title)}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {new Date(question.created_at).toLocaleDateString()}
-                  </span>
-                </summary>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xs text-gray-600">
-                        Asked by{" "}
-                        {question.author?.username || question.author?.full_name}
-                      </span>
-                      {question.author && (
-                        <RoleBadge role={question.author.role_type} />
-                      )}
-                      <span className="text-xs text-gray-500">
-                        {new Date(question.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
+              <div key={question.id} className="section-compact">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <h3 style={{ margin: 0, fontSize: 16 }}>{truncateTitle(question.title)}</h3>
+                  <div className="row" style={{ gap: 6 }}>
                     {(user?.id === question.author_id || isAdmin) && (
-                      <div className="flex gap-2">
-                        <Link
-                          to={`/qna/${question.id}/edit`}
-                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                        >
-                          수정
+                      <>
+                        <Link to={`/qna/${question.id}/edit`} className="btn btn-ghost">
+                          Edit
                         </Link>
-                        <Form method="post" className="inline">
+                        <Form method="post">
                           <input type="hidden" name="intent" value="deleteQuestion" />
                           <input type="hidden" name="questionId" value={question.id} />
                           <button
                             type="submit"
+                            className="btn btn-danger"
                             onClick={(e) =>
-                              !confirm("정말 삭제하시겠습니까?") && e.preventDefault()
+                              !confirm("Delete this question?") && e.preventDefault()
                             }
-                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                           >
-                            삭제
+                            Delete
                           </button>
                         </Form>
-                      </div>
+                      </>
                     )}
                   </div>
-                  <p className="text-sm text-gray-700 mb-2">
-                    {question.content}
-                  </p>
-
-                  {/* Replies */}
-                  {questionReplies.length > 0 && (
-                    <div className="border-t pt-4 space-y-4">
-                      <h4 className="font-semibold text-gray-900">Answers:</h4>
-                      {questionReplies.map((reply) => (
-                        <div
-                          key={reply.id}
-                          className="pl-4 border-l-2 border-blue-500"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-semibold text-sm text-gray-900">
-                                {reply.author?.username ||
-                                  reply.author?.full_name}
-                              </span>
-                              {reply.author && (
-                                <RoleBadge role={reply.author.role_type} />
-                              )}
-                              <span className="text-xs text-gray-500">
-                                {new Date(reply.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                            {(user?.id === reply.author_id || isAdmin) && (
-                              <div className="flex gap-2">
-                                <Link
-                                  to={`/qna/reply/${reply.id}/edit`}
-                                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                                >
-                                  수정
-                                </Link>
-                                <Form method="post" className="inline">
-                                  <input type="hidden" name="intent" value="deleteReply" />
-                                  <input type="hidden" name="replyId" value={reply.id} />
-                                  <button
-                                    type="submit"
-                                    onClick={(e) =>
-                                      !confirm("정말 삭제하시겠습니까?") && e.preventDefault()
-                                    }
-                                    className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                                  >
-                                    삭제
-                                  </button>
-                                </Form>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-700">
-                            {reply.content}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Reply form (mentors only) */}
-                  {isMentor && (
-                    <details className="mt-4">
-                      <summary className="text-sm text-blue-600 cursor-pointer hover:text-blue-700 font-medium">
-                        Answer this question
-                      </summary>
-                      <Form
-                        method="post"
-                        className="mt-3"
-                        ref={(el) => {
-                          answerFormRefs.current[question.id] = el;
-                        }}
-                      >
-                        <input
-                          type="hidden"
-                          name="intent"
-                          value="replyToQuestion"
-                        />
-                        <input
-                          type="hidden"
-                          name="questionId"
-                          value={question.id}
-                        />
-                        <textarea
-                          name="content"
-                          rows={3}
-                          required
-                          placeholder="Write your answer..."
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border"
-                        />
-                        <button
-                          type="submit"
-                          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                        >
-                          Submit Answer
-                        </button>
-                      </Form>
-                    </details>
-                  )}
                 </div>
-              </details>
+                <div className="muted" style={{ fontSize: 13, margin: "4px 0" }}>
+                  Asked by {question.author?.username || question.author?.full_name} •{" "}
+                  {new Date(question.created_at).toLocaleDateString()}
+                </div>
+                <p className="muted" style={{ marginTop: 6 }}>
+                  {question.content}
+                </p>
+
+                {questionReplies.length > 0 && (
+                  <div className="divider" />
+                )}
+
+                {questionReplies.length > 0 && (
+                  <div className="list">
+                    {questionReplies.map((reply) => (
+                      <div key={reply.id} className="section-compact" style={{ background: "var(--surface-2)" }}>
+                        <div className="row" style={{ justifyContent: "space-between" }}>
+                          <div className="row" style={{ gap: 6 }}>
+                            <span style={{ fontWeight: 600, fontSize: 13 }}>
+                              {reply.author?.username || reply.author?.full_name}
+                            </span>
+                            {reply.author && (
+                              <RoleBadge role={reply.author.role_type} className="text-xs py-0 px-1" />
+                            )}
+                            <span className="meta">
+                              {new Date(reply.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {(user?.id === reply.author_id || isAdmin) && (
+                            <div className="row" style={{ gap: 6 }}>
+                              <Link to={`/qna/reply/${reply.id}/edit`} className="btn btn-ghost">
+                                Edit
+                              </Link>
+                              <Form method="post">
+                                <input type="hidden" name="intent" value="deleteReply" />
+                                <input type="hidden" name="replyId" value={reply.id} />
+                                <button
+                                  type="submit"
+                                  className="btn btn-danger"
+                                  onClick={(e) =>
+                                    !confirm("Delete this reply?") && e.preventDefault()
+                                  }
+                                >
+                                  Delete
+                                </button>
+                              </Form>
+                            </div>
+                          )}
+                        </div>
+                        <p className="muted" style={{ margin: 0 }}>
+                          {reply.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isMentor && (
+                  <details style={{ marginTop: 10 }}>
+                    <summary className="nav-link" style={{ padding: 0 }}>
+                      Answer this question
+                    </summary>
+                    <Form method="post" style={{ marginTop: 8 }}>
+                      <input type="hidden" name="intent" value="replyToQuestion" />
+                      <input type="hidden" name="questionId" value={question.id} />
+                      <textarea name="content" rows={3} required className="textarea" />
+                      <button type="submit" className="btn btn-accent" style={{ marginTop: 6 }}>
+                        Submit Answer
+                      </button>
+                    </Form>
+                  </details>
+                )}
+              </div>
             );
           })}
 
           {questions.length === 0 && (
-            <div className="bg-white rounded-lg shadow p-8 text-center">
-              <p className="text-gray-500">No questions yet.</p>
+            <div className="section-compact">
+              <p className="muted" style={{ margin: 0 }}>
+                No questions yet.
+              </p>
             </div>
           )}
         </div>

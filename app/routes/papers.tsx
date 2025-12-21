@@ -4,11 +4,10 @@ import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 
-// Server-side loader to fetch all papers
+// Server-side loader to fetch all published papers
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
-  // Get current user (optional - papers are public)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -23,7 +22,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     profile = data;
   }
 
-  // Fetch all papers with author info
   const { data: papers, error } = await supabase
     .from("articles")
     .select(
@@ -51,67 +49,54 @@ export default function Papers() {
   const { papers, user, profile } = useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="page">
       <Nav user={user || undefined} profile={profile || undefined} />
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">All Papers</h1>
-          {user && (
-            <Link
-              to="/papers/new"
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-            >
-              Submit New Paper
-            </Link>
-          )}
+      <div className="page-body">
+        <div className="section">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>
+              <h1 style={{ fontSize: 22, margin: 0 }}>Published Papers</h1>
+              <p className="muted" style={{ margin: 0 }}>
+                Explore all published submissions.
+              </p>
+            </div>
+            {user && (
+              <Link to="/papers/new" className="btn btn-accent">
+                Submit New Paper
+              </Link>
+            )}
+          </div>
         </div>
 
         {papers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-500">No papers submitted yet.</p>
+          <div className="section">
+            <p className="muted" style={{ margin: 0 }}>
+              No papers submitted yet.
+            </p>
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="card-grid">
             {papers.map((paper) => (
-              <div
-                key={paper.id}
-                className="bg-white rounded-lg shadow hover:shadow-md transition p-6"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <Link
-                      to={`/papers/${paper.id}`}
-                      className="text-xl font-semibold text-gray-900 hover:text-blue-600"
-                    >
-                      {paper.title}
+              <div key={paper.id} className="section-compact">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>
+                    <Link to={`/papers/${paper.id}`} className="nav-link" style={{ padding: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>
+                        {paper.title}
+                      </h3>
                     </Link>
-                    <div className="mt-2 flex items-center space-x-4">
-                      <span className="text-sm text-gray-600">
-                        by{" "}
-                        {paper.author?.username || paper.author?.full_name}
+                    <div className="row" style={{ gap: 8, marginTop: 4 }}>
+                      <span className="muted" style={{ fontSize: 13 }}>
+                        by {paper.author?.username || paper.author?.full_name}
                       </span>
-                      {paper.author && (
-                        <RoleBadge role={paper.author.role_type} />
-                      )}
-                      <span className="text-sm text-gray-500">
+                      {paper.author && <RoleBadge role={paper.author.role_type} />}
+                      <span className="muted" style={{ fontSize: 13 }}>
                         {new Date(paper.created_at).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
-                  <div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        paper.status === "published"
-                          ? "bg-green-100 text-green-800"
-                          : paper.status === "in_review"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {paper.status}
-                    </span>
-                  </div>
+                  <span className="pill">Published</span>
                 </div>
               </div>
             ))}

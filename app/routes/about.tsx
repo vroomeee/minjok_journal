@@ -1,12 +1,10 @@
-import { useLoaderData } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/about";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 
-// Server-side loader to get user info
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -28,98 +26,74 @@ export default function About() {
   const { user, profile } = useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="page">
       <Nav user={user || undefined} profile={profile || undefined} />
+      <div className="page-body">
+        <div className="section">
+          <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+            <div>
+              <h1 style={{ fontSize: 22, margin: 0 }}>About Minjok Journal</h1>
+              <p className="muted" style={{ margin: 0 }}>
+                Academic paper review platform for mentors and mentees.
+              </p>
+            </div>
+            <Link to="/auth/signup" className="btn btn-accent">
+              Get Started
+            </Link>
+          </div>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto bg-white rounded-lg shadow p-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">
-            About 민족 Journal
-          </h1>
-
-          <div className="prose max-w-none space-y-6">
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-3">
-                What is 민족 Journal?
-              </h2>
-              <p className="text-gray-700">
-                민족 Journal is an academic paper review platform designed to
-                connect mentors and mentees in a collaborative learning
-                environment. Our platform enables students and researchers to
-                submit their academic work for review, receive expert feedback,
-                and engage in meaningful discussions.
+          <div className="list">
+            <section className="section-compact" style={{ borderRadius: 8 }}>
+              <h2 style={{ fontSize: 16, margin: "0 0 6px" }}>What is Minjok Journal?</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                Minjok Journal connects mentors and mentees to submit academic work, receive expert
+                feedback, and collaborate on research through structured reviews and discussions.
               </p>
             </section>
 
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-3">
-                Key Features
-              </h2>
-              <ul className="list-disc list-inside text-gray-700 space-y-2">
-                <li>
-                  <strong>Paper Submission & Version Control:</strong> Upload
-                  academic papers with support for multiple versions, making it
-                  easy to track revisions and improvements over time.
-                </li>
-                <li>
-                  <strong>Review System:</strong> Receive detailed feedback and
-                  reviews from mentors and peers on your submitted work.
-                </li>
-                <li>
-                  <strong>Q&A Platform:</strong> Ask questions and get expert
-                  answers from experienced mentors in your field.
-                </li>
-                <li>
-                  <strong>Community Board:</strong> Stay updated with
-                  announcements, news, and important information.
-                </li>
-                <li>
-                  <strong>Role-Based System:</strong> Clear distinction between
-                  mentors and mentees, with specialized features for each role.
-                </li>
+            <section className="section-compact" style={{ borderRadius: 8 }}>
+              <h2 style={{ fontSize: 16, margin: "0 0 6px" }}>Key Features</h2>
+              <ul className="muted" style={{ margin: 0, paddingLeft: 16, lineHeight: 1.6 }}>
+                <li>Paper submission with version control and tracked revisions.</li>
+                <li>Structured reviews from mentors and peers.</li>
+                <li>Q&A platform for domain-specific questions.</li>
+                <li>Community board for announcements and updates.</li>
+                <li>Role-based system distinguishing mentors and mentees.</li>
               </ul>
             </section>
 
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-3">
-                Roles
-              </h2>
-              <div className="space-y-3">
+            <section className="section-compact" style={{ borderRadius: 8 }}>
+              <h2 style={{ fontSize: 16, margin: "0 0 6px" }}>Roles</h2>
+              <div className="list" style={{ gap: 8 }}>
                 <div>
-                  <h3 className="font-semibold text-gray-900">
-                    <span className="px-2 py-1 rounded text-xs bg-green-500 text-green-900 mr-2">
+                  <div className="row" style={{ gap: 8 }}>
+                    <span className="pill" style={{ background: "#103c2d" }}>
                       Mentee
                     </span>
-                    Mentees
-                  </h3>
-                  <p className="text-gray-700 ml-16">
-                    Students and researchers who submit papers for review, ask
-                    questions, and seek guidance from mentors.
+                    <h3 style={{ margin: 0, fontSize: 14 }}>Mentees</h3>
+                  </div>
+                  <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                    Submit papers, ask questions, and seek feedback from mentors.
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">
-                    <span className="px-2 py-1 rounded text-xs bg-yellow-500 text-yellow-900 mr-2">
+                  <div className="row" style={{ gap: 8 }}>
+                    <span className="pill" style={{ background: "#3a2e0b" }}>
                       Mentor
                     </span>
-                    Mentors
-                  </h3>
-                  <p className="text-gray-700 ml-16">
-                    Experienced academics and researchers who provide reviews,
-                    answer questions, and guide mentees in their academic
-                    journey.
+                    <h3 style={{ margin: 0, fontSize: 14 }}>Mentors</h3>
+                  </div>
+                  <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                    Provide reviews, answer questions, and guide mentees through research.
                   </p>
                 </div>
               </div>
             </section>
 
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-3">
-                Get Started
-              </h2>
-              <p className="text-gray-700">
-                Ready to join? Create an account to start submitting papers,
-                engaging with the community, and advancing your academic work.
+            <section className="section-compact" style={{ borderRadius: 8 }}>
+              <h2 style={{ fontSize: 16, margin: "0 0 6px" }}>Get Started</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                Create an account to submit papers, join discussions, and collaborate with mentors.
               </p>
             </section>
           </div>
