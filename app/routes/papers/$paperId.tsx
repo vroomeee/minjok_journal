@@ -174,38 +174,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { success: true };
   }
 
-  if (intent === "publish") {
-    const { user, profile } = await getUserProfile(request);
-
-    const { data: paper } = await supabase
-      .from("articles")
-      .select("author_id, status")
-      .eq("id", paperId)
-      .single();
-
-    if (!paper || (paper.author_id !== user.id && profile.admin_type !== "admin")) {
-      throw new Response("Unauthorized", { status: 403 });
-    }
-
-    if (paper.status === "published") {
-      return { error: "Paper is already published" };
-    }
-
-    const newTitle = (formData.get("publishTitle") as string) || paper.title;
-    const newDescription = (formData.get("publishDescription") as string) || null;
-
-    const { error } = await supabase
-      .from("articles")
-      .update({ status: "published", title: newTitle, description: newDescription })
-      .eq("id", paperId);
-
-    if (error) {
-      return { error: "Failed to publish paper" };
-    }
-
-    return redirect(`/papers/${paperId}`);
-  }
-
   if (intent === "unpublish") {
     const { user, profile } = await getUserProfile(request);
 
