@@ -18,6 +18,7 @@ export default [
   route("papers", "routes/papers.tsx"),
   route("papers/new", "routes/papers/new.tsx"),
   route("papers/:paperId", "routes/papers/$paperId.tsx"),
+  route("papers/:paperId/publish", "routes/papers/$paperId.publish.tsx"),
   route("papers/:paperId/new-version", "routes/papers/$paperId.new-version.tsx"),
   route("papers/:paperId/versions/:versionId", "routes/papers/$paperId.versions.$versionId.tsx"),
 

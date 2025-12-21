@@ -37,6 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       )
     `
     )
+    .eq("status", "published")
     .order("created_at", { ascending: false });
 
   if (error) {

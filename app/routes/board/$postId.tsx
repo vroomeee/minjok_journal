@@ -5,6 +5,7 @@ import {
   useNavigation,
   useRevalidator,
   Link,
+  redirect,
 } from "react-router";
 import type { Route } from "./+types/$postId";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
@@ -80,32 +81,71 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   };
 }
 
-// Server-side action to add comment
+// Server-side action to add comment or delete post
 export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
   const { postId } = params;
 
   const formData = await request.formData();
-  const body = formData.get("body") as string;
+  const intent = formData.get("intent") as string;
 
-  if (!body) {
-    return { error: "Comment is required" };
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("admin_type, id")
+    .eq("id", user.id)
+    .single();
+
+  const isAdmin = profile?.admin_type === "admin";
+
+  if (intent === "delete") {
+    // Get post to check ownership
+    const { data: post } = await supabase
+      .from("board_posts")
+      .select("author_id")
+      .eq("id", postId)
+      .single();
+
+    if (!post || (post.author_id !== user.id && !isAdmin)) {
+      return { error: "Unauthorized to delete this post" };
+    }
+
+    const { error } = await supabase
+      .from("board_posts")
+      .delete()
+      .eq("id", postId);
+
+    if (error) {
+      return { error: "Failed to delete post" };
+    }
+
+    return redirect("/board");
   }
 
-  const { error } = await supabase.from("comments").insert({
-    article_id: postId,
-    version_id: postId, // Using postId as placeholder
-    author_id: user.id,
-    body,
-    parent_id: null,
-  });
+  if (intent === "comment") {
+    const body = formData.get("body") as string;
 
-  if (error) {
-    return { error: "Failed to post comment" };
+    if (!body) {
+      return { error: "Comment is required" };
+    }
+
+    const { error } = await supabase.from("comments").insert({
+      article_id: postId,
+      version_id: postId,
+      author_id: user.id,
+      body,
+      parent_id: null,
+    });
+
+    if (error) {
+      return { error: "Failed to post comment" };
+    }
+
+    return { success: true };
   }
 
-  return { success: true };
+  return null;
 }
 
 export default function BoardPost() {
@@ -115,6 +155,11 @@ export default function BoardPost() {
 
   const { post, comments, user, profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+
+  const isAdmin = profile?.admin_type === "admin";
+  const isAuthor = user?.id === post.author?.id;
+  const canEdit = isAdmin || isAuthor;
+  const canDelete = isAdmin || isAuthor;
 
   // Reset form and revalidate data when action succeeds
   useEffect(() => {
@@ -152,9 +197,35 @@ export default function BoardPost() {
 
         {/* Post content */}
         <div className="bg-white rounded-lg shadow p-8 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            {post.title}
-          </h1>
+          <div className="flex justify-between items-start mb-4">
+            <h1 className="text-3xl font-bold text-gray-900">
+              {post.title}
+            </h1>
+            {canEdit && (
+              <div className="flex gap-2">
+                <Link
+                  to={`/board/${post.id}/edit`}
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  수정
+                </Link>
+                {canDelete && (
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="delete" />
+                    <button
+                      type="submit"
+                      onClick={(e) =>
+                        !confirm("정말 삭제하시겠습니까?") && e.preventDefault()
+                      }
+                      className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                    >
+                      삭제
+                    </button>
+                  </Form>
+                )}
+              </div>
+            )}
+          </div>
           <div className="flex items-center space-x-3 mb-6 text-sm text-gray-600">
             <span>
               Posted by {post.author?.username || post.author?.full_name}
@@ -186,6 +257,7 @@ export default function BoardPost() {
           {/* Comment form */}
           {user ? (
             <Form method="post" className="mb-6" ref={commentFormRef}>
+              <input type="hidden" name="intent" value="comment" />
               <textarea
                 name="body"
                 rows={3}

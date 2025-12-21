@@ -74,13 +74,22 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { questions: questions || [], replies, user, profile };
 }
 
-// Server-side action - create question or reply
+// Server-side action - create question or reply, delete question or reply
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
 
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("admin_type, role_type")
+    .eq("id", user.id)
+    .single();
+
+  const isAdmin = profile?.admin_type === "admin";
 
   if (intent === "askQuestion") {
     const title = formData.get("title") as string;
@@ -105,12 +114,6 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "replyToQuestion") {
     // Check if user is a mentor
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role_type")
-      .eq("id", user.id)
-      .single();
-
     if (!profile || profile.role_type !== "mentor") {
       return { error: "Only mentors can reply to questions" };
     }
@@ -130,6 +133,58 @@ export async function action({ request }: Route.ActionArgs) {
 
     if (error) {
       return { error: "Failed to post reply" };
+    }
+
+    return { success: true };
+  }
+
+  if (intent === "deleteQuestion") {
+    const questionId = formData.get("questionId") as string;
+
+    // Get question to check ownership
+    const { data: question } = await supabase
+      .from("qna_questions")
+      .select("author_id")
+      .eq("id", questionId)
+      .single();
+
+    if (!question || (question.author_id !== user.id && !isAdmin)) {
+      return { error: "Unauthorized to delete this question" };
+    }
+
+    const { error } = await supabase
+      .from("qna_questions")
+      .delete()
+      .eq("id", questionId);
+
+    if (error) {
+      return { error: "Failed to delete question" };
+    }
+
+    return { success: true };
+  }
+
+  if (intent === "deleteReply") {
+    const replyId = formData.get("replyId") as string;
+
+    // Get reply to check ownership
+    const { data: reply } = await supabase
+      .from("qna_replies")
+      .select("author_id")
+      .eq("id", replyId)
+      .single();
+
+    if (!reply || (reply.author_id !== user.id && !isAdmin)) {
+      return { error: "Unauthorized to delete this reply" };
+    }
+
+    const { error } = await supabase
+      .from("qna_replies")
+      .delete()
+      .eq("id", replyId);
+
+    if (error) {
+      return { error: "Failed to delete reply" };
     }
 
     return { success: true };
@@ -162,6 +217,9 @@ export default function QnA() {
   const answerFormRefs = useRef<Record<string, HTMLFormElement | null>>({});
 
   const isMentor = profile?.role_type === "mentor";
+  const isAdmin = profile?.admin_type === "admin";
+  const truncateTitle = (title: string) =>
+    title.length > 20 ? `${title.slice(0, 20)}...` : title;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -228,24 +286,49 @@ export default function QnA() {
               >
                 <summary className="text-xl cursor-pointer list-none pr-6 py-1 flex justify-between items-center hover:bg-gray-50">
                   <span className="font-medium text-gray-900">
-                    {question.title}
+                    {truncateTitle(question.title)}
                   </span>
                   <span className="text-sm text-gray-500">
                     {new Date(question.created_at).toLocaleDateString()}
                   </span>
                 </summary>
                 <div>
-                  <div className="flex items-center space-x-3 mb-2">
-                    <span className="text-xs text-gray-600">
-                      Asked by{" "}
-                      {question.author?.username || question.author?.full_name}
-                    </span>
-                    {question.author && (
-                      <RoleBadge role={question.author.role_type} />
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xs text-gray-600">
+                        Asked by{" "}
+                        {question.author?.username || question.author?.full_name}
+                      </span>
+                      {question.author && (
+                        <RoleBadge role={question.author.role_type} />
+                      )}
+                      <span className="text-xs text-gray-500">
+                        {new Date(question.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {(user?.id === question.author_id || isAdmin) && (
+                      <div className="flex gap-2">
+                        <Link
+                          to={`/qna/${question.id}/edit`}
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          수정
+                        </Link>
+                        <Form method="post" className="inline">
+                          <input type="hidden" name="intent" value="deleteQuestion" />
+                          <input type="hidden" name="questionId" value={question.id} />
+                          <button
+                            type="submit"
+                            onClick={(e) =>
+                              !confirm("정말 삭제하시겠습니까?") && e.preventDefault()
+                            }
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          >
+                            삭제
+                          </button>
+                        </Form>
+                      </div>
                     )}
-                    <span className="text-xs text-gray-500">
-                      {new Date(question.created_at).toLocaleDateString()}
-                    </span>
                   </div>
                   <p className="text-sm text-gray-700 mb-2">
                     {question.content}
@@ -260,17 +343,42 @@ export default function QnA() {
                           key={reply.id}
                           className="pl-4 border-l-2 border-blue-500"
                         >
-                          <div className="flex items-center space-x-2 mb-2">
-                            <span className="font-semibold text-sm text-gray-900">
-                              {reply.author?.username ||
-                                reply.author?.full_name}
-                            </span>
-                            {reply.author && (
-                              <RoleBadge role={reply.author.role_type} />
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-semibold text-sm text-gray-900">
+                                {reply.author?.username ||
+                                  reply.author?.full_name}
+                              </span>
+                              {reply.author && (
+                                <RoleBadge role={reply.author.role_type} />
+                              )}
+                              <span className="text-xs text-gray-500">
+                                {new Date(reply.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {(user?.id === reply.author_id || isAdmin) && (
+                              <div className="flex gap-2">
+                                <Link
+                                  to={`/qna/reply/${reply.id}/edit`}
+                                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                  수정
+                                </Link>
+                                <Form method="post" className="inline">
+                                  <input type="hidden" name="intent" value="deleteReply" />
+                                  <input type="hidden" name="replyId" value={reply.id} />
+                                  <button
+                                    type="submit"
+                                    onClick={(e) =>
+                                      !confirm("정말 삭제하시겠습니까?") && e.preventDefault()
+                                    }
+                                    className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                                  >
+                                    삭제
+                                  </button>
+                                </Form>
+                              </div>
                             )}
-                            <span className="text-xs text-gray-500">
-                              {new Date(reply.created_at).toLocaleDateString()}
-                            </span>
                           </div>
                           <p className="text-sm text-gray-700">
                             {reply.content}

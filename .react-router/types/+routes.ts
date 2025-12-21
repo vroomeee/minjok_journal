@@ -37,6 +37,11 @@ type Pages = {
       "paperId": string;
     };
   };
+  "/papers/:paperId/publish": {
+    params: {
+      "paperId": string;
+    };
+  };
   "/papers/:paperId/new-version": {
     params: {
       "paperId": string;
@@ -78,7 +83,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/board" | "/board/new" | "/board/:postId";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/board" | "/board/new" | "/board/:postId";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -111,6 +116,10 @@ type RouteFiles = {
   "routes/papers/$paperId.tsx": {
     id: "routes/papers/$paperId";
     page: "/papers/:paperId";
+  };
+  "routes/papers/$paperId.publish.tsx": {
+    id: "routes/papers/$paperId.publish";
+    page: "/papers/:paperId/publish";
   };
   "routes/papers/$paperId.new-version.tsx": {
     id: "routes/papers/$paperId.new-version";
@@ -160,6 +169,7 @@ type RouteModules = {
   "routes/papers": typeof import("./app/routes/papers.tsx");
   "routes/papers/new": typeof import("./app/routes/papers/new.tsx");
   "routes/papers/$paperId": typeof import("./app/routes/papers/$paperId.tsx");
+  "routes/papers/$paperId.publish": typeof import("./app/routes/papers/$paperId.publish.tsx");
   "routes/papers/$paperId.new-version": typeof import("./app/routes/papers/$paperId.new-version.tsx");
   "routes/papers/$paperId.versions.$versionId": typeof import("./app/routes/papers/$paperId.versions.$versionId.tsx");
   "routes/my-papers": typeof import("./app/routes/my-papers.tsx");

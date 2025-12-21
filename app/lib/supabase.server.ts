@@ -1,4 +1,5 @@
 import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
 // Server-side Supabase client creation
@@ -27,6 +28,23 @@ export function createSupabaseServerClient(request: Request) {
   );
 
   return { supabase, headers };
+}
+
+// Service-role client for privileged server-only operations (bypasses RLS)
+// Returns null when the service key is not configured.
+export function createSupabaseAdminClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) return null;
+
+  const supabase = createSupabaseClient<Database>(
+    process.env.SUPABASE_URL!,
+    serviceRoleKey,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }
+  );
+
+  return { supabase };
 }
 
 // Get the current user session from server-side
