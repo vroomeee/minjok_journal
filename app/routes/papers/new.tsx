@@ -19,6 +19,21 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!title || !file) return { error: "Title and file are required" };
 
+  // Throttle duplicate submits: block if the user created an article in the last 5 seconds.
+  const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+  const { data: recentArticle } = await supabase
+    .from("articles")
+    .select("id, created_at")
+    .eq("author_id", user.id)
+    .gte("created_at", fiveSecondsAgo)
+    .limit(1)
+    .maybeSingle();
+  if (recentArticle) {
+    return {
+      error: "You can only upload an article every 5 seconds. Please wait a moment.",
+    };
+  }
+
   const { data: article, error: articleError } = await supabase
     .from("articles")
     .insert({

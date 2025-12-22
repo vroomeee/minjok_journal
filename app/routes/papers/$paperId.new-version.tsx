@@ -44,6 +44,22 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (!file) return { error: "File is required" };
 
+  // Throttle duplicate uploads: limit to one version upload every 5 seconds per user.
+  const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+  const { data: recentVersion } = await supabase
+    .from("article_versions")
+    .select("id, created_at")
+    .eq("article_id", paperId)
+    .eq("author_id", user.id)
+    .gte("created_at", fiveSecondsAgo)
+    .limit(1)
+    .maybeSingle();
+  if (recentVersion) {
+    return {
+      error: "You can only upload a new version every 5 seconds. Please wait a moment.",
+    };
+  }
+
   const { data: paper } = await supabase
     .from("articles")
     .select("author_id")
