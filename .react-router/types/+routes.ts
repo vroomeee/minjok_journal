@@ -116,12 +116,15 @@ type Pages = {
       "postId": string;
     };
   };
+  "/admin": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit" | "/admin";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -235,6 +238,10 @@ type RouteFiles = {
     id: "routes/board/$postId.edit";
     page: "/board/:postId/edit";
   };
+  "routes/admin.tsx": {
+    id: "routes/admin";
+    page: "/admin";
+  };
 };
 
 type RouteModules = {
@@ -267,4 +274,5 @@ type RouteModules = {
   "routes/board/new": typeof import("./app/routes/board/new.tsx");
   "routes/board/$postId": typeof import("./app/routes/board/$postId.tsx");
   "routes/board/$postId.edit": typeof import("./app/routes/board/$postId.edit.tsx");
+  "routes/admin": typeof import("./app/routes/admin.tsx");
 };
