@@ -17,14 +17,21 @@ export default [
   route("auth/reset-password", "routes/auth/reset-password.tsx"),
   route("auth/confirm", "routes/auth/confirm.tsx"),
   route("auth/error", "routes/auth/error.tsx"),
+  route("auth/resend", "routes/auth/resend.tsx"),
 
   // Paper routes
   route("papers", "routes/papers.tsx"),
   route("papers/new", "routes/papers/new.tsx"),
   route("papers/:paperId", "routes/papers/$paperId.tsx"),
   route("papers/:paperId/publish", "routes/papers/$paperId.publish.tsx"),
-  route("papers/:paperId/new-version", "routes/papers/$paperId.new-version.tsx"),
-  route("papers/:paperId/versions/:versionId", "routes/papers/$paperId.versions.$versionId.tsx"),
+  route(
+    "papers/:paperId/new-version",
+    "routes/papers/$paperId.new-version.tsx"
+  ),
+  route(
+    "papers/:paperId/versions/:versionId",
+    "routes/papers/$paperId.versions.$versionId.tsx"
+  ),
 
   // User routes
   route("my-papers", "routes/my-papers.tsx"),

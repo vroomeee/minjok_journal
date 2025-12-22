@@ -15,9 +15,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const origin = url.origin;
 
   const formData = await request.formData();
+  const intent = (formData.get("intent") as string) || "signup";
   const email = formData.get("email") as string;
+
   const password = formData.get("password") as string;
   const repeatPassword = formData.get("repeat-password") as string;
+
+  // If the email is already registered, bail early with a friendly message.
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  if (existingProfile) {
+    return Response.json(
+      {
+        error:
+          "An account with this email already exists. Try logging in or resend the confirmation email.",
+      },
+      { status: 400, headers }
+    );
+  }
 
   if (!password) {
     return Response.json({ error: "Password is required" }, { status: 400, headers });
@@ -37,8 +55,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (error) {
+    const msg =
+      error.message || "Failed to sign up";
     return Response.json(
-      { error: error.message || "Failed to sign up" },
+      { error: msg },
       { status: 400, headers }
     );
   }
@@ -89,6 +109,9 @@ export default function Signup() {
               <div className="row" style={{ marginTop: 12 }}>
                 <Link to="/auth/login" className="btn btn-accent">
                   Go to login
+                </Link>
+                <Link to="/auth/resend" className="btn btn-ghost">
+                  Need a new confirmation email?
                 </Link>
               </div>
             </>
@@ -161,6 +184,11 @@ export default function Signup() {
                   </button>
                 </div>
               </fetcher.Form>
+              <div className="row" style={{ marginTop: 12 }}>
+                <Link to="/auth/resend" className="btn btn-ghost">
+                  Need a new confirmation email?
+                </Link>
+              </div>
             </>
           )}
         </div>

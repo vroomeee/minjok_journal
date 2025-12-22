@@ -52,8 +52,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return redirect(target, { headers });
     }
 
-    return redirect(
-      `/auth/error?error=${encodeURIComponent(exchangeError?.message ?? error?.message ?? "Unknown error")}`
+    return Response.json(
+      { next, error: exchangeError?.message ?? error?.message ?? "Confirmation link is invalid or expired." },
+      { status: 400, headers }
     );
   }
 
@@ -64,12 +65,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function ConfirmPage() {
   const data = useLoaderData<typeof loader>();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<"loading" | "error">("loading");
-  const [message, setMessage] = useState<string | null>(null);
+  const [status, setStatus] = useState<"loading" | "error">(data?.error ? "error" : "loading");
+  const [message, setMessage] = useState<string | null>(data?.error ?? null);
 
   useEffect(() => {
     let active = true;
     async function handleHash() {
+      if (data?.error) return;
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const access_token = hashParams.get("access_token");
       const refresh_token = hashParams.get("refresh_token");
@@ -113,7 +115,7 @@ export default function ConfirmPage() {
     return () => {
       active = false;
     };
-  }, [data?.next, navigate]);
+  }, [data?.next, data?.error, navigate]);
 
   return (
     <div className="page">

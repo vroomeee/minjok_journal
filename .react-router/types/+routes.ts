@@ -38,6 +38,9 @@ type Pages = {
   "/auth/error": {
     params: {};
   };
+  "/auth/resend": {
+    params: {};
+  };
   "/papers": {
     params: {};
   };
@@ -98,7 +101,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/qna/new" | "/board" | "/board/new" | "/board/:postId";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/qna/new" | "/board" | "/board/new" | "/board/:postId";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -135,6 +138,10 @@ type RouteFiles = {
   "routes/auth/error.tsx": {
     id: "routes/auth/error";
     page: "/auth/error";
+  };
+  "routes/auth/resend.tsx": {
+    id: "routes/auth/resend";
+    page: "/auth/resend";
   };
   "routes/papers.tsx": {
     id: "routes/papers";
@@ -205,6 +212,7 @@ type RouteModules = {
   "routes/auth/reset-password": typeof import("./app/routes/auth/reset-password.tsx");
   "routes/auth/confirm": typeof import("./app/routes/auth/confirm.tsx");
   "routes/auth/error": typeof import("./app/routes/auth/error.tsx");
+  "routes/auth/resend": typeof import("./app/routes/auth/resend.tsx");
   "routes/papers": typeof import("./app/routes/papers.tsx");
   "routes/papers/new": typeof import("./app/routes/papers/new.tsx");
   "routes/papers/$paperId": typeof import("./app/routes/papers/$paperId.tsx");
