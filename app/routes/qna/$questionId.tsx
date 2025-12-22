@@ -1,4 +1,4 @@
-import { Form, Link, redirect, useActionData, useLoaderData, useNavigation, useFetcher, useRevalidator } from "react-router";
+import { Form, Link, redirect, useActionData, useLoaderData, useFetcher, useRevalidator } from "react-router";
 import type { Route } from "./+types/$questionId";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -120,7 +120,27 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
     const { error } = await supabase.from("qna_replies").delete().eq("id", replyId);
     if (error) return { error: "Failed to delete reply" };
-    return redirect(`/qna/${questionId}`);
+    return { success: true };
+  }
+
+  if (intent === "editReply") {
+    const replyId = formData.get("replyId") as string;
+    const content = formData.get("content") as string;
+    if (!replyId) return { error: "Reply not found" };
+    if (!content) return { error: "Reply content is required" };
+
+    const { data: reply } = await supabase
+      .from("qna_replies")
+      .select("author_id")
+      .eq("id", replyId)
+      .single();
+    if (!reply || (reply.author_id !== user.id && !isAdmin)) {
+      return { error: "Unauthorized to edit this reply" };
+    }
+
+    const { error } = await supabase.from("qna_replies").update({ content }).eq("id", replyId);
+    if (error) return { error: "Failed to update reply" };
+    return { success: true };
   }
 
   return null;
@@ -129,31 +149,31 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function QnaDetail() {
   const { user, profile, question, replies } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const navigation = useNavigation();
   const replyFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
   const replyFormRef = useRef<HTMLFormElement>(null);
-  const prevReplyState = useRef<"idle" | "loading" | "submitting">(replyFetcher.state);
+  const editReplyFormsRef = useRef<HTMLFormElement[]>([]);
+  const handledReplySuccess = useRef(false);
+  const rowsForBody = (body: string) =>
+    Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
 
   const isMentor = profile?.role_type === "mentor";
   const isAdmin = profile?.admin_type === "admin";
 
   useEffect(() => {
-    if (navigation.state === "idle") {
-      replyFormRef.current?.reset();
+    if (replyFetcher.state === "submitting") {
+      handledReplySuccess.current = false;
     }
-  }, [navigation.state]);
-
-  useEffect(() => {
     if (
-      prevReplyState.current === "submitting" &&
-      replyFetcher.state === "idle" &&
-      replyFetcher.data?.success
+      !handledReplySuccess.current &&
+      replyFetcher.data?.success &&
+      replyFetcher.state === "idle"
     ) {
       replyFormRef.current?.reset();
+      editReplyFormsRef.current.forEach((f) => f?.reset());
       revalidator.revalidate();
+      handledReplySuccess.current = true;
     }
-    prevReplyState.current = replyFetcher.state;
   }, [replyFetcher.state, replyFetcher.data, revalidator]);
 
   return (
@@ -216,6 +236,10 @@ export default function QnaDetail() {
               className="list"
               style={{ marginBottom: 12 }}
               ref={replyFormRef}
+              onSubmit={(e) => {
+                handledReplySuccess.current = false;
+                e.currentTarget.reset();
+              }}
             >
               <input type="hidden" name="intent" value="replyToQuestion" />
               <textarea
@@ -256,23 +280,67 @@ export default function QnaDetail() {
                       <Link to={`/qna/reply/${reply.id}/edit`} className="btn btn-ghost">
                         Edit
                       </Link>
-                      <Form method="post">
+                      <replyFetcher.Form
+                        method="post"
+                        ref={(form) => {
+                          if (form && !editReplyFormsRef.current.includes(form)) {
+                            editReplyFormsRef.current.push(form);
+                          }
+                        }}
+                      >
                         <input type="hidden" name="intent" value="deleteReply" />
                         <input type="hidden" name="replyId" value={reply.id} />
                         <button
                           type="submit"
                           className="btn btn-danger"
                           onClick={(e) => !confirm("Delete this reply?") && e.preventDefault()}
+                          disabled={replyFetcher.state === "submitting"}
                         >
                           Delete
                         </button>
-                      </Form>
+                      </replyFetcher.Form>
                     </div>
                   )}
                 </div>
                 <p className="muted" style={{ margin: 0 }}>
                   {reply.content}
                 </p>
+                {(user?.id === reply.author_id || isAdmin) && (
+                  <details style={{ marginTop: 6 }}>
+                    <summary className="nav-link" style={{ padding: 0 }}>
+                      Edit reply
+                    </summary>
+                    <replyFetcher.Form
+                      method="post"
+                      className="list"
+                      style={{ marginTop: 6 }}
+                      ref={(form) => {
+                        if (form && !editReplyFormsRef.current.includes(form)) {
+                          editReplyFormsRef.current.push(form);
+                        }
+                      }}
+                    >
+                      <input type="hidden" name="intent" value="editReply" />
+                      <input type="hidden" name="replyId" value={reply.id} />
+                      <textarea
+                        name="content"
+                        defaultValue={reply.content}
+                        rows={rowsForBody(reply.content)}
+                        required
+                        className="textarea"
+                        style={{ width: "100%" }}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-accent"
+                        style={{ marginTop: 4 }}
+                        disabled={replyFetcher.state === "submitting"}
+                      >
+                        {replyFetcher.state === "submitting" ? "Saving..." : "Save"}
+                      </button>
+                    </replyFetcher.Form>
+                  </details>
+                )}
               </div>
             ))}
 

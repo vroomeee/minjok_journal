@@ -289,6 +289,37 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { success: true };
   }
 
+  if (intent === "editComment" || intent === "deleteComment") {
+    const commentId = formData.get("commentId") as string;
+    if (!commentId) return { error: "Comment not found" };
+
+    const { data: comment } = await supabase
+      .from("comments")
+      .select("author_id")
+      .eq("id", commentId)
+      .single();
+    if (!comment) return { error: "Comment not found" };
+
+    const { user, profile } = await getUserProfile(request);
+    const isAdmin = profile.admin_type === "admin";
+    if (comment.author_id !== user.id && !isAdmin) {
+      return { error: "Unauthorized" };
+    }
+
+    if (intent === "deleteComment") {
+      const { error } = await supabase.from("comments").delete().eq("id", commentId);
+      if (error) return { error: "Failed to delete comment" };
+      return { success: true };
+    }
+
+    const body = formData.get("body") as string;
+    if (!body) return { error: "Comment body is required" };
+
+    const { error } = await supabase.from("comments").update({ body }).eq("id", commentId);
+    if (error) return { error: "Failed to update comment" };
+    return { success: true };
+  }
+
   return null;
 }
 
@@ -299,17 +330,22 @@ export default function PaperDetail() {
   const commentFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
   const commentFormsRef = useRef<HTMLFormElement[]>([]);
-  const prevCommentState = useRef<"idle" | "loading" | "submitting">(commentFetcher.state);
+  const editCommentFormsRef = useRef<HTMLFormElement[]>([]);
+  const handledCommentSuccess = useRef(false);
   useEffect(() => {
+    if (commentFetcher.state === "submitting") {
+      handledCommentSuccess.current = false;
+    }
     if (
-      prevCommentState.current === "submitting" &&
+      !handledCommentSuccess.current &&
       commentFetcher.state === "idle" &&
       commentFetcher.data?.success
     ) {
       commentFormsRef.current.forEach((form) => form?.reset());
+      editCommentFormsRef.current.forEach((form) => form?.reset());
       revalidator.revalidate();
+      handledCommentSuccess.current = true;
     }
-    prevCommentState.current = commentFetcher.state;
   }, [commentFetcher.state, commentFetcher.data, revalidator]);
 
   const [showVersions, setShowVersions] = useState(paper.status !== "published");
@@ -323,6 +359,8 @@ export default function PaperDetail() {
   const showComments = paper.status === "published" && !!activeVersionId;
   const truncateNotes = (notes?: string | null) =>
     notes && notes.length > 200 ? `${notes.slice(0, 200)}...` : notes;
+  const rowsForBody = (body: string) =>
+    Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
 
   return (
     <div className="page">
@@ -533,6 +571,11 @@ export default function PaperDetail() {
                     commentFormsRef.current.push(form);
                   }
                 }}
+                onSubmit={(e) => {
+                  handledCommentSuccess.current = false;
+                  // Clear immediately for better UX; fetcher will still submit values already serialized
+                  e.currentTarget.reset();
+                }}
                 data-comment-form
               >
                 <input type="hidden" name="intent" value="comment" />
@@ -561,7 +604,7 @@ export default function PaperDetail() {
             <div className="card-grid">
               {comments.map((comment) => (
                 <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
-                  <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+                  <div className="row" style={{ gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
                       <UserLink user={comment.author} />
                     </span>
@@ -574,6 +617,55 @@ export default function PaperDetail() {
                     <span className="meta">
                       {new Date(comment.created_at).toLocaleDateString()}
                     </span>
+                    {(user?.id === comment.author_id || profile?.admin_type === "admin") && (
+                      <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                        <commentFetcher.Form method="post">
+                          <input type="hidden" name="intent" value="deleteComment" />
+                          <input type="hidden" name="commentId" value={comment.id} />
+                          <button
+                            type="submit"
+                            className="btn btn-ghost"
+                            onClick={(e) => !confirm("Delete this comment?") && e.preventDefault()}
+                          >
+                            Delete
+                          </button>
+                        </commentFetcher.Form>
+                        <details>
+                          <summary className="nav-link" style={{ padding: 0 }}>
+                            Edit
+                          </summary>
+                          <commentFetcher.Form
+                            method="post"
+                            className="list"
+                            style={{ marginTop: 6 }}
+                            ref={(form) => {
+                              if (form && !editCommentFormsRef.current.includes(form)) {
+                                editCommentFormsRef.current.push(form);
+                              }
+                            }}
+                          >
+                            <input type="hidden" name="intent" value="editComment" />
+                            <input type="hidden" name="commentId" value={comment.id} />
+                            <textarea
+                              name="body"
+                              defaultValue={comment.body}
+                              rows={rowsForBody(comment.body)}
+                              required
+                              className="textarea"
+                              style={{ width: "100%" }}
+                            />
+                            <button
+                              type="submit"
+                              className="btn btn-accent"
+                              style={{ marginTop: 4 }}
+                              disabled={commentFetcher.state === "submitting"}
+                            >
+                              {commentFetcher.state === "submitting" ? "Saving..." : "Save"}
+                            </button>
+                          </commentFetcher.Form>
+                        </details>
+                      </div>
+                    )}
                   </div>
                   <p className="muted" style={{ margin: 0 }}>
                     {comment.body}
