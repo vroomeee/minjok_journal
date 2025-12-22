@@ -4,6 +4,8 @@ import {
   redirect,
   useActionData,
   useNavigation,
+  useFetcher,
+  useRevalidator,
 } from "react-router";
 import type { Route } from "./+types/$paperId.versions.$versionId";
 import {
@@ -14,6 +16,7 @@ import {
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef } from "react";
+import { UserLink } from "~/components/user-link";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -237,20 +240,35 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (error) return { error: "Failed to post comment" };
 
-  return redirect(`/papers/${paperId}/versions/${versionId}`);
+  return { success: true };
 }
 
 export default function VersionReview() {
   const formRef = useRef<HTMLFormElement>(null);
   const navigation = useNavigation();
+  const { paper, version, fileUrl, comments, replies, user, profile, totalVersions } =
+    useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const commentFetcher = useFetcher<typeof action>();
+  const revalidator = useRevalidator();
+  const commentFormsRef = useRef<HTMLFormElement[]>([]);
+  const prevCommentState = useRef<"idle" | "loading" | "submitting">(commentFetcher.state);
   useEffect(() => {
     if (navigation.state === "idle") {
       formRef.current?.reset();
     }
   }, [navigation.state]);
-  const { paper, version, fileUrl, comments, replies, user, profile, totalVersions } =
-    useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  useEffect(() => {
+    if (
+      prevCommentState.current === "submitting" &&
+      commentFetcher.state === "idle" &&
+      commentFetcher.data?.success
+    ) {
+      commentFormsRef.current.forEach((f) => f?.reset());
+      revalidator.revalidate();
+    }
+    prevCommentState.current = commentFetcher.state;
+  }, [commentFetcher.state, commentFetcher.data, revalidator]);
   const isAdmin = profile?.admin_type === "admin";
   const isAuthor = user?.id === paper?.author_id;
   const canEditNotes = isAdmin || isAuthor;
@@ -364,7 +382,17 @@ export default function VersionReview() {
           <h3 style={{ fontSize: 18, marginBottom: 10 }}>Reviews & Comments</h3>
 
           {user ? (
-            <Form method="post" ref={formRef} className="list" style={{ marginBottom: 12 }}>
+            <commentFetcher.Form
+              method="post"
+              ref={(form) => {
+                if (form && !commentFormsRef.current.includes(form)) {
+                  commentFormsRef.current.push(form);
+                }
+                formRef.current = form || undefined;
+              }}
+              className="list"
+              style={{ marginBottom: 12 }}
+            >
               <input type="hidden" name="intent" value="addComment" />
               <textarea
                 name="body"
@@ -373,10 +401,14 @@ export default function VersionReview() {
                 className="textarea"
                 placeholder="Write your review or comment..."
               />
-              <button type="submit" className="btn btn-accent">
-                Post Comment
+              <button
+                type="submit"
+                className="btn btn-accent"
+                disabled={commentFetcher.state === "submitting"}
+              >
+                {commentFetcher.state === "submitting" ? "Posting..." : "Post Comment"}
               </button>
-            </Form>
+            </commentFetcher.Form>
           ) : (
             <p className="muted" style={{ marginBottom: 12 }}>
               Please log in to leave a comment.
@@ -391,7 +423,7 @@ export default function VersionReview() {
                 <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
                   <div className="row" style={{ gap: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
-                      {comment.author?.email || comment.author?.full_name}
+                      <UserLink user={comment.author} />
                     </span>
                     {comment.author && (
                       <RoleBadge role={comment.author.role_type} className="text-xs py-0 px-1" />
@@ -410,7 +442,7 @@ export default function VersionReview() {
                         <div key={reply.id} className="section-compact" style={{ background: "var(--surface-2)" }}>
                           <div className="row" style={{ gap: 6 }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>
-                              {reply.author?.email || reply.author?.full_name}
+                              <UserLink user={reply.author} />
                             </span>
                             {reply.author && (
                               <RoleBadge
@@ -435,7 +467,15 @@ export default function VersionReview() {
                       <summary className="nav-link" style={{ padding: 0 }}>
                         Reply
                       </summary>
-                      <Form method="post" style={{ marginTop: 6 }}>
+                      <commentFetcher.Form
+                        method="post"
+                        style={{ marginTop: 6 }}
+                        ref={(form) => {
+                          if (form && !commentFormsRef.current.includes(form)) {
+                            commentFormsRef.current.push(form);
+                          }
+                        }}
+                      >
                         <input type="hidden" name="intent" value="addComment" />
                         <input type="hidden" name="parentId" value={comment.id} />
                         <textarea
@@ -445,10 +485,15 @@ export default function VersionReview() {
                           className="textarea"
                           placeholder="Write a reply..."
                         />
-                        <button type="submit" className="btn btn-accent" style={{ marginTop: 6 }}>
-                          Reply
+                        <button
+                          type="submit"
+                          className="btn btn-accent"
+                          style={{ marginTop: 6 }}
+                          disabled={commentFetcher.state === "submitting"}
+                        >
+                          {commentFetcher.state === "submitting" ? "Posting..." : "Reply"}
                         </button>
-                      </Form>
+                      </commentFetcher.Form>
                     </details>
                   )}
                 </div>

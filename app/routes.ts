@@ -24,6 +24,7 @@ export default [
   route("papers/new", "routes/papers/new.tsx"),
   route("papers/:paperId", "routes/papers/$paperId.tsx"),
   route("papers/:paperId/publish", "routes/papers/$paperId.publish.tsx"),
+  route("papers/:paperId/edit", "routes/papers/$paperId.edit.tsx"),
   route(
     "papers/:paperId/new-version",
     "routes/papers/$paperId.new-version.tsx"
@@ -37,10 +38,12 @@ export default [
   route("my-papers", "routes/my-papers.tsx"),
   route("review", "routes/review.tsx"),
   route("profile/:userId", "routes/profile/$userId.tsx"),
+  route("profile/:userId/edit", "routes/profile/$userId.edit.tsx"),
 
   // Community routes
   route("qna", "routes/qna.tsx"),
   route("qna/new", "routes/qna/new.tsx"),
+  route("qna/:questionId", "routes/qna/$questionId.tsx"),
   route("board", "routes/board.tsx"),
   route("board/new", "routes/board/new.tsx"),
   route("board/:postId", "routes/board/$postId.tsx"),

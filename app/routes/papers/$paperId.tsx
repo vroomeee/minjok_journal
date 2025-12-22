@@ -1,9 +1,10 @@
-import { Link, useLoaderData, Form, redirect, useActionData } from "react-router";
-import { useState } from "react";
+import { Link, useLoaderData, Form, redirect, useActionData, useFetcher, useRevalidator } from "react-router";
+import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/$paperId";
 import { createSupabaseServerClient, getUserProfile } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
+import { UserLink } from "~/components/user-link";
 
 // Server-side loader to fetch paper details
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -285,7 +286,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Failed to post comment" };
     }
 
-    return redirect(`/papers/${paperId}`);
+    return { success: true };
   }
 
   return null;
@@ -295,10 +296,23 @@ export default function PaperDetail() {
   const { paper, user, profile, comments, activeVersionId, publishedVersion, publishedFileUrl } =
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const commentFetcher = useFetcher<typeof action>();
+  const revalidator = useRevalidator();
+  const commentFormsRef = useRef<HTMLFormElement[]>([]);
+  const prevCommentState = useRef<"idle" | "loading" | "submitting">(commentFetcher.state);
+  useEffect(() => {
+    if (
+      prevCommentState.current === "submitting" &&
+      commentFetcher.state === "idle" &&
+      commentFetcher.data?.success
+    ) {
+      commentFormsRef.current.forEach((form) => form?.reset());
+      revalidator.revalidate();
+    }
+    prevCommentState.current = commentFetcher.state;
+  }, [commentFetcher.state, commentFetcher.data, revalidator]);
 
   const [showVersions, setShowVersions] = useState(paper.status !== "published");
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(paper.title);
 
   const isAuthor = user?.id === paper.author?.id;
   const isAdmin = profile?.admin_type === "admin";
@@ -325,61 +339,14 @@ export default function PaperDetail() {
 
         <div className="section">
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
-            {isEditingTitle && (isAuthor || isAdmin) ? (
-              <Form
-                method="post"
-                className="row"
-                onSubmit={() => setIsEditingTitle(false)}
-                style={{ flex: 1, gap: 10 }}
-              >
-                <input type="hidden" name="intent" value="updateTitle" />
-                <input
-                  type="text"
-                  name="title"
-                  value={draftTitle}
-                  onChange={(e) => setDraftTitle(e.target.value)}
-                  className="input"
-                  style={{
-                    fontSize: 26,
-                    fontWeight: 700,
-                    background: "transparent",
-                    borderRadius: 0,
-                    borderLeft: "none",
-                    borderRight: "none",
-                    borderTop: "none",
-                  }}
-                  required
-                />
-                <div className="row">
-                  <button type="submit" className="btn">
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditingTitle(false);
-                      setDraftTitle(paper.title);
-                    }}
-                    className="btn btn-ghost"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </Form>
-            ) : (
-              <div className="row" style={{ gap: 10 }}>
-                <h1 style={{ fontSize: 26 }}>{paper.title}</h1>
-                {(isAuthor || isAdmin) && (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingTitle(true)}
-                    className="btn"
-                  >
-                    Edit Title
-                  </button>
-                )}
-              </div>
-            )}
+            <div className="row" style={{ gap: 10 }}>
+              <h1 style={{ fontSize: 26 }}>{paper.title}</h1>
+              {(isAuthor || isAdmin) && (
+                <Link to={`/papers/${paper.id}/edit`} className="btn">
+                  Edit Title or Description
+                </Link>
+              )}
+            </div>
             <span className="pill">
               {paper.status === "published"
                 ? "Published"
@@ -391,7 +358,7 @@ export default function PaperDetail() {
 
           <div className="row" style={{ flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
             <span className="meta">
-              by {paper.author?.email || paper.author?.full_name}
+              by <UserLink user={paper.author} />
             </span>
             {paper.author && <RoleBadge role={paper.author.role_type} />}
             <span className="meta">{new Date(paper.created_at).toLocaleDateString()}</span>
@@ -558,7 +525,16 @@ export default function PaperDetail() {
           <div className="section">
             <h2 style={{ fontSize: 18, marginBottom: 10 }}>Paper Comments</h2>
             {user ? (
-              <Form method="post" style={{ marginBottom: 12 }}>
+              <commentFetcher.Form
+                method="post"
+                style={{ marginBottom: 12 }}
+                ref={(form) => {
+                  if (form && !commentFormsRef.current.includes(form)) {
+                    commentFormsRef.current.push(form);
+                  }
+                }}
+                data-comment-form
+              >
                 <input type="hidden" name="intent" value="comment" />
                 <textarea
                   name="body"
@@ -567,10 +543,15 @@ export default function PaperDetail() {
                   className="textarea"
                   placeholder="Share feedback or peer review for this published paper..."
                 />
-                <button type="submit" className="btn btn-accent" style={{ marginTop: 8 }}>
-                  Post Comment
+                <button
+                  type="submit"
+                  className="btn btn-accent"
+                  style={{ marginTop: 8 }}
+                  disabled={commentFetcher.state === "submitting"}
+                >
+                  {commentFetcher.state === "submitting" ? "Posting..." : "Post Comment"}
                 </button>
-              </Form>
+              </commentFetcher.Form>
             ) : (
               <p className="muted" style={{ marginBottom: 12 }}>
                 Please log in to leave a comment.
@@ -582,7 +563,7 @@ export default function PaperDetail() {
                 <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
                   <div className="row" style={{ gap: 8, marginBottom: 4 }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
-                      {comment.author?.email || comment.author?.full_name}
+                      <UserLink user={comment.author} />
                     </span>
                     {comment.author && (
                       <RoleBadge

@@ -57,6 +57,11 @@ type Pages = {
       "paperId": string;
     };
   };
+  "/papers/:paperId/edit": {
+    params: {
+      "paperId": string;
+    };
+  };
   "/papers/:paperId/new-version": {
     params: {
       "paperId": string;
@@ -79,11 +84,21 @@ type Pages = {
       "userId": string;
     };
   };
+  "/profile/:userId/edit": {
+    params: {
+      "userId": string;
+    };
+  };
   "/qna": {
     params: {};
   };
   "/qna/new": {
     params: {};
+  };
+  "/qna/:questionId": {
+    params: {
+      "questionId": string;
+    };
   };
   "/board": {
     params: {};
@@ -106,7 +121,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/qna/new" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -164,6 +179,10 @@ type RouteFiles = {
     id: "routes/papers/$paperId.publish";
     page: "/papers/:paperId/publish";
   };
+  "routes/papers/$paperId.edit.tsx": {
+    id: "routes/papers/$paperId.edit";
+    page: "/papers/:paperId/edit";
+  };
   "routes/papers/$paperId.new-version.tsx": {
     id: "routes/papers/$paperId.new-version";
     page: "/papers/:paperId/new-version";
@@ -184,6 +203,10 @@ type RouteFiles = {
     id: "routes/profile/$userId";
     page: "/profile/:userId";
   };
+  "routes/profile/$userId.edit.tsx": {
+    id: "routes/profile/$userId.edit";
+    page: "/profile/:userId/edit";
+  };
   "routes/qna.tsx": {
     id: "routes/qna";
     page: "/qna";
@@ -191,6 +214,10 @@ type RouteFiles = {
   "routes/qna/new.tsx": {
     id: "routes/qna/new";
     page: "/qna/new";
+  };
+  "routes/qna/$questionId.tsx": {
+    id: "routes/qna/$questionId";
+    page: "/qna/:questionId";
   };
   "routes/board.tsx": {
     id: "routes/board";
@@ -226,13 +253,16 @@ type RouteModules = {
   "routes/papers/new": typeof import("./app/routes/papers/new.tsx");
   "routes/papers/$paperId": typeof import("./app/routes/papers/$paperId.tsx");
   "routes/papers/$paperId.publish": typeof import("./app/routes/papers/$paperId.publish.tsx");
+  "routes/papers/$paperId.edit": typeof import("./app/routes/papers/$paperId.edit.tsx");
   "routes/papers/$paperId.new-version": typeof import("./app/routes/papers/$paperId.new-version.tsx");
   "routes/papers/$paperId.versions.$versionId": typeof import("./app/routes/papers/$paperId.versions.$versionId.tsx");
   "routes/my-papers": typeof import("./app/routes/my-papers.tsx");
   "routes/review": typeof import("./app/routes/review.tsx");
   "routes/profile/$userId": typeof import("./app/routes/profile/$userId.tsx");
+  "routes/profile/$userId.edit": typeof import("./app/routes/profile/$userId.edit.tsx");
   "routes/qna": typeof import("./app/routes/qna.tsx");
   "routes/qna/new": typeof import("./app/routes/qna/new.tsx");
+  "routes/qna/$questionId": typeof import("./app/routes/qna/$questionId.tsx");
   "routes/board": typeof import("./app/routes/board.tsx");
   "routes/board/new": typeof import("./app/routes/board/new.tsx");
   "routes/board/$postId": typeof import("./app/routes/board/$postId.tsx");

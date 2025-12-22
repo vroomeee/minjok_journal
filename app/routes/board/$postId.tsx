@@ -12,6 +12,7 @@ import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef } from "react";
+import { UserLink } from "~/components/user-link";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -184,7 +185,7 @@ export default function BoardPost() {
           </div>
           <div className="row" style={{ flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
             <span className="meta">
-              Posted by {post.author?.email || post.author?.full_name}
+              Posted by <UserLink user={post.author} />
             </span>
             {post.author && <RoleBadge role={post.author.role_type} />}
             {post.author?.admin_type === "admin" && <span className="pill">Admin</span>}
@@ -232,9 +233,9 @@ export default function BoardPost() {
             {comments.map((comment) => (
               <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
                 <div className="row" style={{ gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>
-                    {comment.author?.email || comment.author?.full_name}
-                  </span>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>
+                      <UserLink user={comment.author} />
+                    </span>
                   {comment.author && (
                     <RoleBadge role={comment.author.role_type} className="text-xs py-0 px-1" />
                   )}

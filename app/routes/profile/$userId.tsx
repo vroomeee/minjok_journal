@@ -1,6 +1,6 @@
-import { useLoaderData, Form, redirect, useActionData } from "react-router";
+import { useLoaderData } from "react-router";
 import type { Route } from "./+types/$userId";
-import { createSupabaseServerClient, getUserProfile } from "~/lib/supabase.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { Link } from "react-router";
@@ -40,31 +40,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return { user, currentUserProfile, profile, papers: papers || [] };
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
-  const { user } = await getUserProfile(request);
-  const { supabase } = createSupabaseServerClient(request);
-  const { userId } = params;
-
-  if (user.id !== userId) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
-  const formData = await request.formData();
-  const fullName = formData.get("full_name") as string;
-  const intro = formData.get("intro") as string;
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ full_name: fullName, intro })
-    .eq("id", userId);
-
-  if (error) return { error: "Failed to update profile" };
-  return redirect(`/profile/${userId}`);
-}
-
 export default function ProfilePage() {
   const { user, currentUserProfile, profile, papers } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
   const isOwnProfile = user?.id === profile.id;
 
   return (
@@ -83,6 +60,11 @@ export default function ProfilePage() {
                 {profile.role_type && <RoleBadge role={profile.role_type} />}
               </div>
             </div>
+            {isOwnProfile && (
+              <Link to={`/profile/${profile.id}/edit`} className="btn btn-ghost">
+                Edit Profile
+              </Link>
+            )}
           </div>
 
           {profile.intro && (
@@ -91,44 +73,6 @@ export default function ProfilePage() {
             </p>
           )}
 
-          {actionData?.error && (
-            <div className="section-compact subtle" style={{ marginTop: 10 }}>
-              <p className="text-sm" style={{ color: "#f6b8bd" }}>
-                {actionData.error}
-              </p>
-            </div>
-          )}
-
-          {isOwnProfile && (
-            <div className="section-compact" style={{ marginTop: 10 }}>
-              <h3 style={{ fontSize: 16, margin: "0 0 6px" }}>Edit Profile</h3>
-              <Form method="post" className="list">
-                <div>
-                  <label className="label">Full Name</label>
-                  <input
-                    type="text"
-                    name="full_name"
-                    defaultValue={profile.full_name || ""}
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label className="label">Intro</label>
-                  <textarea
-                    name="intro"
-                    rows={3}
-                    className="textarea"
-                    defaultValue={profile.intro || ""}
-                  />
-                </div>
-                <div className="row">
-                  <button type="submit" className="btn btn-accent">
-                    Save
-                  </button>
-                </div>
-              </Form>
-            </div>
-          )}
         </div>
 
         <div className="section">

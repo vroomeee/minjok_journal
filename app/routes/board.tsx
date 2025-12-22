@@ -3,6 +3,7 @@ import type { Route } from "./+types/board";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { useRef } from "react";
+import { UserLink } from "~/components/user-link";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -175,7 +176,7 @@ export default function Board() {
                     </div>
                   </div>
                   <span className="muted" style={{ fontSize: 13 }}>
-                    {post.author?.email || post.author?.full_name || "Unknown"}
+                    <UserLink user={post.author} fallback="Unknown" />
                   </span>
                   <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
                     {new Date(post.created_at).toLocaleDateString()}

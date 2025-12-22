@@ -3,6 +3,7 @@ import type { Route } from "./+types/papers";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
+import { UserLink } from "~/components/user-link";
 
 // Server-side loader to fetch all published papers
 export async function loader({ request }: Route.LoaderArgs) {
@@ -177,7 +178,7 @@ export default function Papers() {
                     </div>
                   </div>
                   <span className="muted" style={{ fontSize: 13 }}>
-                    {paper.author?.email || paper.author?.full_name || "Unknown"}
+                    <UserLink user={paper.author} fallback="Unknown" />
                   </span>
                   <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
                     {new Date(paper.created_at).toLocaleDateString()}
