@@ -50,7 +50,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     .from("article_versions")
     .select("id, created_at")
     .eq("article_id", paperId)
-    .eq("author_id", user.id)
     .gte("created_at", fiveSecondsAgo)
     .limit(1)
     .maybeSingle();

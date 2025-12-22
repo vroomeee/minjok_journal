@@ -44,4 +44,5 @@ export default [
   route("board", "routes/board.tsx"),
   route("board/new", "routes/board/new.tsx"),
   route("board/:postId", "routes/board/$postId.tsx"),
+  route("board/:postId/edit", "routes/board/$postId.edit.tsx"),
 ] satisfies RouteConfig;

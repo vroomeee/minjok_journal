@@ -9,7 +9,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const search = url.searchParams.get("search") || "";
-  const perPage = 10;
+  const perPage = 6;
 
   const {
     data: { user },
@@ -65,6 +65,7 @@ export default function Board() {
   const searchFormRef = useRef<HTMLFormElement>(null);
   const { posts, user, profile, currentPage, totalPages, search } =
     useLoaderData<typeof loader>();
+  const perPage = 6;
 
   const isAdmin = profile?.admin_type === "admin";
 
@@ -124,58 +125,90 @@ export default function Board() {
             </p>
           </div>
         ) : (
-          <div className="card-grid">
-            {posts.map((post, index) => (
-              <div key={post.id} className="section-compact">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div>
-                    <Link to={`/board/${post.id}`} className="nav-link" style={{ padding: 0 }}>
-                      <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>
-                        {post.title}
-                      </h3>
-                    </Link>
-                    <div className="row" style={{ gap: 8, marginTop: 4 }}>
-                      {post.author?.admin_type === "admin" && <span className="pill">Admin</span>}
-                      <span className="muted" style={{ fontSize: 13 }}>
-                        by {post.author?.email || post.author?.full_name}
-                      </span>
-                      <span className="muted" style={{ fontSize: 13 }}>
-                        {new Date(post.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="muted" style={{ fontSize: 12 }}>
-                    #{(currentPage - 1) * 10 + index + 1}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="row" style={{ justifyContent: "center", gap: 6 }}>
-            {getPageNumbers().map((pageNum, idx) =>
-              pageNum === "..." ? (
-                <span key={`ellipsis-${idx}`} className="muted">
-                  ...
+          <>
+            <div className="section-compact" style={{ padding: 0 }}>
+              <div
+                className="section-compact"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "60px 1fr 180px 120px",
+                  gap: 8,
+                  padding: "10px 12px",
+                  borderBottom: `1px solid var(--border)`,
+                  background: "var(--surface-2)",
+                }}
+              >
+                <span className="muted" style={{ fontWeight: 600 }}>
+                  No.
                 </span>
-              ) : (
-                <Link
-                  key={pageNum}
-                  to={`/board?page=${pageNum}${search ? `&search=${search}` : ""}`}
-                  className="btn btn-ghost"
+                <span className="muted" style={{ fontWeight: 600 }}>
+                  Title
+                </span>
+                <span className="muted" style={{ fontWeight: 600 }}>
+                  Author
+                </span>
+                <span className="muted" style={{ fontWeight: 600, textAlign: "right" }}>
+                  Date
+                </span>
+              </div>
+              {posts.map((post, index) => (
+                <div
+                  key={post.id}
                   style={{
-                    background: pageNum === currentPage ? "var(--surface-2)" : "transparent",
-                    borderColor: pageNum === currentPage ? "var(--accent)" : "var(--border)",
+                    display: "grid",
+                    gridTemplateColumns: "60px 1fr 180px 120px",
+                    gap: 8,
+                    alignItems: "center",
+                    padding: "10px 12px",
+                    borderBottom: `1px solid var(--border)`,
                   }}
                 >
-                  {pageNum}
-                </Link>
-              )
+                  <span className="muted" style={{ fontSize: 13 }}>
+                    {(currentPage - 1) * perPage + index + 1}
+                  </span>
+                  <div>
+                    <Link to={`/board/${post.id}`} className="nav-link" style={{ padding: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: 15, color: "var(--text)" }}>{post.title}</h3>
+                    </Link>
+                    <div className="row" style={{ gap: 6, marginTop: 2 }}>
+                      <span className="pill">{post.author?.admin_type === "admin" ? "중요" : "일반"}</span>
+                    </div>
+                  </div>
+                  <span className="muted" style={{ fontSize: 13 }}>
+                    {post.author?.email || post.author?.full_name || "Unknown"}
+                  </span>
+                  <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
+                    {new Date(post.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="row" style={{ justifyContent: "center", gap: 6 }}>
+                {getPageNumbers().map((pageNum, idx) =>
+                  pageNum === "..." ? (
+                    <span key={`ellipsis-${idx}`} className="muted">
+                      ...
+                    </span>
+                  ) : (
+                    <Link
+                      key={pageNum}
+                      to={`/board?page=${pageNum}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
+                      className="btn btn-ghost"
+                      style={{
+                        background: pageNum === currentPage ? "var(--surface-2)" : "transparent",
+                        borderColor: pageNum === currentPage ? "var(--accent)" : "var(--border)",
+                      }}
+                    >
+                      {pageNum}
+                    </Link>
+                  )
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
+
       </div>
     </div>
   );
