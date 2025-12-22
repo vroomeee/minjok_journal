@@ -6,7 +6,7 @@ interface NavProps {
     email?: string;
   };
   profile?: {
-    username: string | null;
+    email: string | null;
     role_type: "mentor" | "mentee";
     admin_type: "admin" | "user";
   };
@@ -46,7 +46,7 @@ export function Nav({ user, profile }: NavProps) {
                 My Papers
               </Link>
               <Link to={`/profile/${user.id}`} className="nav-link">
-                <span className="pill">{profile.username || user.email}</span>
+                <span className="pill">{profile.email || user.email}</span>
               </Link>
               <Form method="post" action="/auth/logout">
                 <button type="submit" className="btn btn-ghost" style={{ padding: "6px 10px" }}>

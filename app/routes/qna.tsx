@@ -38,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       author:profiles!author_id (
         id,
-        username,
+        email,
         full_name,
         role_type
       )
@@ -56,7 +56,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         *,
         author:profiles!author_id (
           id,
-          username,
+          email,
           full_name,
           role_type
         )
@@ -223,7 +223,7 @@ export default function QnA() {
                   </div>
                 </div>
                 <div className="muted" style={{ fontSize: 13, margin: "4px 0" }}>
-                  Asked by {question.author?.username || question.author?.full_name} •{" "}
+                  Asked by {question.author?.email || question.author?.full_name} •{" "}
                   {new Date(question.created_at).toLocaleDateString()}
                 </div>
                 <p className="muted" style={{ marginTop: 6 }}>
@@ -241,7 +241,7 @@ export default function QnA() {
                         <div className="row" style={{ justifyContent: "space-between" }}>
                           <div className="row" style={{ gap: 6 }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>
-                              {reply.author?.username || reply.author?.full_name}
+                              {reply.author?.email || reply.author?.full_name}
                             </span>
                             {reply.author && (
                               <RoleBadge role={reply.author.role_type} className="text-xs py-0 px-1" />

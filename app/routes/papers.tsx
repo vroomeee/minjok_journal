@@ -29,7 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       author:profiles!author_id (
         id,
-        username,
+        email,
         full_name,
         role_type
       )
@@ -88,7 +88,7 @@ export default function Papers() {
                     </Link>
                     <div className="row" style={{ gap: 8, marginTop: 4 }}>
                       <span className="muted" style={{ fontSize: 13 }}>
-                        by {paper.author?.username || paper.author?.full_name}
+                        by {paper.author?.email || paper.author?.full_name}
                       </span>
                       {paper.author && <RoleBadge role={paper.author.role_type} />}
                       <span className="muted" style={{ fontSize: 13 }}>

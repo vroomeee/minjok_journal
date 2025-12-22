@@ -26,6 +26,18 @@ type Pages = {
   "/auth/logout": {
     params: {};
   };
+  "/auth/forgot-password": {
+    params: {};
+  };
+  "/auth/reset-password": {
+    params: {};
+  };
+  "/auth/confirm": {
+    params: {};
+  };
+  "/auth/error": {
+    params: {};
+  };
   "/papers": {
     params: {};
   };
@@ -86,7 +98,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/qna/new" | "/board" | "/board/new" | "/board/:postId";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/qna" | "/qna/new" | "/board" | "/board/new" | "/board/:postId";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -107,6 +119,22 @@ type RouteFiles = {
   "routes/auth/logout.tsx": {
     id: "routes/auth/logout";
     page: "/auth/logout";
+  };
+  "routes/auth/forgot-password.tsx": {
+    id: "routes/auth/forgot-password";
+    page: "/auth/forgot-password";
+  };
+  "routes/auth/reset-password.tsx": {
+    id: "routes/auth/reset-password";
+    page: "/auth/reset-password";
+  };
+  "routes/auth/confirm.tsx": {
+    id: "routes/auth/confirm";
+    page: "/auth/confirm";
+  };
+  "routes/auth/error.tsx": {
+    id: "routes/auth/error";
+    page: "/auth/error";
   };
   "routes/papers.tsx": {
     id: "routes/papers";
@@ -173,6 +201,10 @@ type RouteModules = {
   "routes/auth/login": typeof import("./app/routes/auth/login.tsx");
   "routes/auth/signup": typeof import("./app/routes/auth/signup.tsx");
   "routes/auth/logout": typeof import("./app/routes/auth/logout.tsx");
+  "routes/auth/forgot-password": typeof import("./app/routes/auth/forgot-password.tsx");
+  "routes/auth/reset-password": typeof import("./app/routes/auth/reset-password.tsx");
+  "routes/auth/confirm": typeof import("./app/routes/auth/confirm.tsx");
+  "routes/auth/error": typeof import("./app/routes/auth/error.tsx");
   "routes/papers": typeof import("./app/routes/papers.tsx");
   "routes/papers/new": typeof import("./app/routes/papers/new.tsx");
   "routes/papers/$paperId": typeof import("./app/routes/papers/$paperId.tsx");

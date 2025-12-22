@@ -20,7 +20,7 @@ export interface Database {
           updated_at: string
           role_type: "mentor" | "mentee"
           admin_type: "admin" | "user"
-          username: string | null
+          email: string | null
           full_name: string | null
           intro: string | null
           avatar_url: string | null
@@ -31,7 +31,7 @@ export interface Database {
           updated_at?: string
           role_type?: "mentor" | "mentee"
           admin_type?: "admin" | "user"
-          username?: string | null
+          email?: string | null
           full_name?: string | null
           intro?: string | null
           avatar_url?: string | null
@@ -42,7 +42,7 @@ export interface Database {
           updated_at?: string
           role_type?: "mentor" | "mentee"
           admin_type?: "admin" | "user"
-          username?: string | null
+          email?: string | null
           full_name?: string | null
           intro?: string | null
           avatar_url?: string | null

@@ -33,7 +33,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       *,
       author:profiles!author_id (
         id,
-        username,
+        email,
         full_name,
         role_type,
         admin_type
@@ -72,7 +72,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         *,
         author:profiles!author_id (
           id,
-          username,
+          email,
           full_name,
           role_type
         )
@@ -391,7 +391,7 @@ export default function PaperDetail() {
 
           <div className="row" style={{ flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
             <span className="meta">
-              by {paper.author?.username || paper.author?.full_name}
+              by {paper.author?.email || paper.author?.full_name}
             </span>
             {paper.author && <RoleBadge role={paper.author.role_type} />}
             <span className="meta">{new Date(paper.created_at).toLocaleDateString()}</span>
@@ -582,7 +582,7 @@ export default function PaperDetail() {
                 <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
                   <div className="row" style={{ gap: 8, marginBottom: 4 }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
-                      {comment.author?.username || comment.author?.full_name}
+                      {comment.author?.email || comment.author?.full_name}
                     </span>
                     {comment.author && (
                       <RoleBadge

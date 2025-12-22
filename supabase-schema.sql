@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   admin_type TEXT CHECK (admin_type IN ('admin', 'user')) DEFAULT 'user',
 
   -- Profile info
-  username TEXT UNIQUE,
+  email TEXT UNIQUE,
   full_name TEXT,
   intro TEXT,
   avatar_url TEXT
@@ -246,12 +246,12 @@ CREATE POLICY "Reply authors can delete their own replies"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, username, full_name)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'username', NEW.email),
-    COALESCE(NEW.raw_user_meta_data->>'full_name', '')
-  );
+  INSERT INTO public.profiles (id, email, full_name)
+    VALUES (
+      NEW.id,
+      COALESCE(NEW.raw_user_meta_data->>'email', NEW.email),
+      COALESCE(NEW.raw_user_meta_data->>'full_name', '')
+    );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

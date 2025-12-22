@@ -13,6 +13,10 @@ export default [
   route("auth/login", "routes/auth/login.tsx"),
   route("auth/signup", "routes/auth/signup.tsx"),
   route("auth/logout", "routes/auth/logout.tsx"),
+  route("auth/forgot-password", "routes/auth/forgot-password.tsx"),
+  route("auth/reset-password", "routes/auth/reset-password.tsx"),
+  route("auth/confirm", "routes/auth/confirm.tsx"),
+  route("auth/error", "routes/auth/error.tsx"),
 
   // Paper routes
   route("papers", "routes/papers.tsx"),

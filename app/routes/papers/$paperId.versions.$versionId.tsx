@@ -57,7 +57,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       *,
       author:profiles!author_id (
         id,
-        username,
+        email,
         full_name,
         role_type
       )
@@ -77,7 +77,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         *,
         author:profiles!author_id (
           id,
-          username,
+          email,
           full_name,
           role_type
         )
@@ -391,7 +391,7 @@ export default function VersionReview() {
                 <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
                   <div className="row" style={{ gap: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
-                      {comment.author?.username || comment.author?.full_name}
+                      {comment.author?.email || comment.author?.full_name}
                     </span>
                     {comment.author && (
                       <RoleBadge role={comment.author.role_type} className="text-xs py-0 px-1" />
@@ -410,7 +410,7 @@ export default function VersionReview() {
                         <div key={reply.id} className="section-compact" style={{ background: "var(--surface-2)" }}>
                           <div className="row" style={{ gap: 6 }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>
-                              {reply.author?.username || reply.author?.full_name}
+                              {reply.author?.email || reply.author?.full_name}
                             </span>
                             {reply.author && (
                               <RoleBadge

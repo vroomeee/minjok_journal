@@ -32,7 +32,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       author:profiles!author_id (
         id,
-        username,
+        email,
         full_name,
         role_type,
         admin_type
@@ -137,7 +137,7 @@ export default function Board() {
                     <div className="row" style={{ gap: 8, marginTop: 4 }}>
                       {post.author?.admin_type === "admin" && <span className="pill">Admin</span>}
                       <span className="muted" style={{ fontSize: 13 }}>
-                        by {post.author?.username || post.author?.full_name}
+                        by {post.author?.email || post.author?.full_name}
                       </span>
                       <span className="muted" style={{ fontSize: 13 }}>
                         {new Date(post.created_at).toLocaleDateString()}

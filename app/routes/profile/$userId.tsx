@@ -76,10 +76,10 @@ export default function ProfilePage() {
           <div className="row" style={{ justifyContent: "space-between" }}>
             <div>
               <h1 style={{ fontSize: 22, margin: 0 }}>
-                {profile.full_name || profile.username || "Unnamed User"}
+                {profile.full_name || profile.email || "Unnamed User"}
               </h1>
               <div className="row" style={{ gap: 8, marginTop: 4 }}>
-                <span className="muted">{profile.username || profile.id}</span>
+                <span className="muted">{profile.email || profile.id}</span>
                 {profile.role_type && <RoleBadge role={profile.role_type} />}
               </div>
             </div>
