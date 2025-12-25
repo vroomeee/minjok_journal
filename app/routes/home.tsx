@@ -9,7 +9,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
 
   let profile = null;
   if (user) {
@@ -54,7 +59,8 @@ export default function Home() {
           <div className="tile">
             <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>Upload & Review</h3>
             <p className="muted" style={{ margin: 0 }}>
-              Submit academic papers with version control and receive detailed reviews.
+              Submit academic papers with version control and receive detailed
+              reviews.
             </p>
           </div>
           <div className="tile">
