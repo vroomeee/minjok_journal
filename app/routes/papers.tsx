@@ -15,7 +15,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    throw authError;
+  }
 
   let profile = null;
   if (user) {
@@ -38,15 +43,22 @@ export async function loader({ request }: Route.LoaderArgs) {
         full_name,
         role_type
       )
-    `
-    , { count: "exact" })
+    `,
+      { count: "exact" }
+    )
     .eq("status", "published");
 
   if (search) {
-    query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    query = query.or(
+      `title.ilike.%${search.replace(/,/g, "")}%,description.ilike.%${search.replace(/,/g, "")}%`
+    );
   }
 
-  const { data: papers, count, error } = await query
+  const {
+    data: papers,
+    count,
+    error,
+  } = await query
     .order("created_at", { ascending: false })
     .range((page - 1) * perPage, page * perPage - 1);
 
@@ -56,7 +68,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const totalPages = Math.ceil((count || 0) / perPage);
 
-  return { papers: papers || [], user, profile, currentPage: page, totalPages, search };
+  return {
+    papers: papers || [],
+    user,
+    profile,
+    currentPage: page,
+    totalPages,
+    search,
+  };
 }
 
 export default function Papers() {
@@ -73,7 +92,15 @@ export default function Papers() {
     } else if (currentPage >= totalPages - 2) {
       pages.push(1, "...", totalPages - 2, totalPages - 1, totalPages);
     } else {
-      pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      pages.push(
+        1,
+        "...",
+        currentPage - 1,
+        currentPage,
+        currentPage + 1,
+        "...",
+        totalPages
+      );
     }
     return pages;
   };
@@ -105,11 +132,6 @@ export default function Papers() {
                   Search
                 </button>
               </Form>
-              {user && (
-                <Link to="/papers/new" className="btn btn-accent">
-                  Submit New Paper
-                </Link>
-              )}
             </div>
           </div>
         </div>
@@ -143,7 +165,10 @@ export default function Papers() {
                 <span className="muted" style={{ fontWeight: 600 }}>
                   Author
                 </span>
-                <span className="muted" style={{ fontWeight: 600, textAlign: "right" }}>
+                <span
+                  className="muted"
+                  style={{ fontWeight: 600, textAlign: "right" }}
+                >
                   Date
                 </span>
               </div>
@@ -162,7 +187,7 @@ export default function Papers() {
                   <span className="muted" style={{ fontSize: 13 }}>
                     {(currentPage - 1) * perPage + idx + 1}
                   </span>
-                  <div>
+                  <div className="row" style={{ gap: 8, alignItems: "center" }}>
                     <Link
                       to={`/papers/${paper.id}`}
                       className="nav-link"
@@ -170,24 +195,30 @@ export default function Papers() {
                     >
                       {paper.title}
                     </Link>
-                    <div className="row" style={{ gap: 6, marginTop: 2 }}>
-                      <span className="pill" style={{ background: "#103c2d" }}>
-                        Published
-                      </span>
-                      {paper.author && <RoleBadge role={paper.author.role_type} />}
-                    </div>
+                    <span className="pill" style={{ background: "#103c2d" }}>
+                      Published
+                    </span>
+                    {paper.author && (
+                      <RoleBadge role={paper.author.role_type} />
+                    )}
                   </div>
                   <span className="muted" style={{ fontSize: 13 }}>
                     <UserLink user={paper.author} fallback="Unknown" />
                   </span>
-                  <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
+                  <span
+                    className="muted"
+                    style={{ fontSize: 13, textAlign: "right" }}
+                  >
                     {new Date(paper.created_at).toLocaleDateString()}
                   </span>
                 </div>
               ))}
             </div>
             {totalPages > 1 && (
-              <div className="row" style={{ justifyContent: "center", gap: 6, marginTop: 12 }}>
+              <div
+                className="row"
+                style={{ justifyContent: "center", gap: 6, marginTop: 12 }}
+              >
                 {getPageNumbers().map((pageNum, idx) =>
                   pageNum === "..." ? (
                     <span key={`ellipsis-${idx}`} className="muted">
@@ -199,8 +230,14 @@ export default function Papers() {
                       to={`/papers?page=${pageNum}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
                       className="btn btn-ghost"
                       style={{
-                        background: pageNum === currentPage ? "var(--surface-2)" : "transparent",
-                        borderColor: pageNum === currentPage ? "var(--accent)" : "var(--border)",
+                        background:
+                          pageNum === currentPage
+                            ? "var(--surface-2)"
+                            : "transparent",
+                        borderColor:
+                          pageNum === currentPage
+                            ? "var(--accent)"
+                            : "var(--border)",
                       }}
                     >
                       {pageNum}

@@ -46,11 +46,6 @@ export default function Home() {
               <Link to="/papers" className="btn btn-accent">
                 Browse Papers
               </Link>
-              {!user && (
-                <Link to="/auth/login" className="btn btn-ghost">
-                  Sign In
-                </Link>
-              )}
             </div>
           </div>
         </div>
