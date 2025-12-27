@@ -7,7 +7,7 @@ interface NavProps {
   };
   profile?: {
     email: string | null;
-    role_type: "mentor" | "mentee";
+    role_type: "mentor" | "mentee" | "admin" | "prof";
     admin_type: "admin" | "user";
   };
 }
@@ -24,9 +24,14 @@ export function Nav({ user, profile }: NavProps) {
             <Link to="/papers" className="nav-link">
               Papers
             </Link>
-            <Link to="/review" className="nav-link">
-              Review Queue
-            </Link>
+            {profile &&
+              (profile.role_type === "mentor" ||
+                profile.role_type === "prof" ||
+                profile.role_type === "admin") && (
+                <Link to="/review" className="nav-link">
+                  Review Queue
+                </Link>
+              )}
             <Link to="/qna" className="nav-link">
               Q&A
             </Link>
@@ -49,7 +54,11 @@ export function Nav({ user, profile }: NavProps) {
                 <span className="pill">{profile.email || user.email}</span>
               </Link>
               <Form method="post" action="/auth/logout">
-                <button type="submit" className="btn btn-ghost" style={{ padding: "6px 10px" }}>
+                <button
+                  type="submit"
+                  className="btn btn-ghost"
+                  style={{ padding: "6px 10px" }}
+                >
                   Logout
                 </button>
               </Form>
@@ -59,7 +68,11 @@ export function Nav({ user, profile }: NavProps) {
               <Link to="/auth/login" className="nav-link">
                 Login
               </Link>
-              <Link to="/auth/signup" className="btn btn-accent" style={{ padding: "6px 12px" }}>
+              <Link
+                to="/auth/signup"
+                className="btn btn-accent"
+                style={{ padding: "6px 12px" }}
+              >
                 Sign Up
               </Link>
             </>

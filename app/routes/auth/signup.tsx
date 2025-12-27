@@ -17,7 +17,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const intent = (formData.get("intent") as string) || "signup";
   const email = formData.get("email") as string;
-
+  const fullName = formData.get("full-name") as string;
   const password = formData.get("password") as string;
   const repeatPassword = formData.get("repeat-password") as string;
 
@@ -37,6 +37,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
+  if (!fullName) {
+    return Response.json({ error: "Full name is required" }, { status: 400, headers });
+  }
+
   if (!password) {
     return Response.json({ error: "Password is required" }, { status: 400, headers });
   }
@@ -45,12 +49,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: "Passwords do not match" }, { status: 400, headers });
   }
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       // This matches the confirm route that exchanges the token, then redirects home.
       emailRedirectTo: `${origin}/auth/confirm?next=/`,
+      data: {
+        full_name: fullName,
+      },
     },
   });
 
@@ -61,6 +68,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { error: msg },
       { status: 400, headers }
     );
+  }
+
+  // Update the profile with the full name
+  if (data.user) {
+    await supabase
+      .from("profiles")
+      .update({ full_name: fullName })
+      .eq("id", data.user.id);
   }
 
   return redirect("/auth/signup?success=1", { headers });
@@ -140,6 +155,19 @@ export default function Signup() {
                     name="email"
                     type="email"
                     placeholder="you@example.com"
+                    required
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="full-name">
+                    Full Name
+                  </label>
+                  <input
+                    id="full-name"
+                    name="full-name"
+                    type="text"
+                    placeholder="Your full name"
                     required
                     className="input"
                   />

@@ -1,4 +1,4 @@
-import { Link, useLoaderData } from "react-router";
+import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/review";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -19,6 +19,17 @@ export async function loader({ request }: Route.LoaderArgs) {
       .eq("id", user.id)
       .single();
     profile = data;
+  }
+
+  // Redirect if user is not logged in or is not a mentor or prof
+  if (
+    !user ||
+    !profile ||
+    (profile.role_type !== "mentor" &&
+      profile.role_type !== "admin" &&
+      profile.role_type !== "prof")
+  ) {
+    return redirect("/");
   }
 
   const { data: papers } = await supabase
@@ -73,10 +84,23 @@ export default function ReviewQueue() {
           <div className="card-grid">
             {papers.map((paper) => (
               <div key={paper.id} className="section-compact">
-                <div className="row" style={{ justifyContent: "space-between" }}>
+                <div
+                  className="row"
+                  style={{ justifyContent: "space-between" }}
+                >
                   <div>
-                    <Link to={`/papers/${paper.id}`} className="nav-link" style={{ padding: 0 }}>
-                      <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>
+                    <Link
+                      to={`/papers/${paper.id}`}
+                      className="nav-link"
+                      style={{ padding: 0 }}
+                    >
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: 16,
+                          color: "var(--text)",
+                        }}
+                      >
                         {paper.title}
                       </h3>
                     </Link>
@@ -84,9 +108,12 @@ export default function ReviewQueue() {
                       <span className="muted" style={{ fontSize: 13 }}>
                         by {paper.author?.email || paper.author?.full_name}
                       </span>
-                      {paper.author && <RoleBadge role={paper.author.role_type} />}
+                      {paper.author && (
+                        <RoleBadge role={paper.author.role_type} />
+                      )}
                       <span className="muted" style={{ fontSize: 13 }}>
-                        Submitted: {new Date(paper.updated_at).toLocaleDateString()}
+                        Submitted:{" "}
+                        {new Date(paper.updated_at).toLocaleDateString()}
                       </span>
                     </div>
                     {paper.current_version && (
