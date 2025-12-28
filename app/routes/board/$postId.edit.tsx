@@ -14,7 +14,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   const { data: post, error } = await supabase
     .from("board_posts")
@@ -40,11 +40,11 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   const { data: post } = await supabase
     .from("board_posts")

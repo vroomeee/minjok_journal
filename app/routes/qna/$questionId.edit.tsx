@@ -22,7 +22,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   // Fetch question
   const { data: question, error } = await supabase
@@ -52,11 +52,11 @@ export async function action({ request, params }: Route.ActionArgs) {
   // Check if user is admin or author
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   const { data: question } = await supabase
     .from("qna_questions")

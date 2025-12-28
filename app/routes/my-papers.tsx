@@ -2,7 +2,7 @@ import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/my-papers";
 import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
-import { RoleBadge } from "~/components/role-badge";
+import { AuthorList } from "~/components/author-list";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
@@ -19,6 +19,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select(
       `
       *,
+      authors:article_authors!inner(
+        profile_id,
+        profile:profiles!article_authors_profile_id_fkey(
+          id,
+          email,
+          full_name,
+          role_type
+        )
+      ),
       versions:article_versions!article_versions_article_id_fkey (
         id,
         version_number,
@@ -26,7 +35,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       )
     `
     )
-    .eq("author_id", user.id)
+    .eq("authors.profile_id", user.id)
     .order("created_at", { ascending: false });
 
   return { papers: papers || [], user, profile };
@@ -75,7 +84,7 @@ export default function MyPapers() {
                       <span className="muted" style={{ fontSize: 13 }}>
                         Status: {paper.status}
                       </span>
-                      {profile && <RoleBadge role={profile.role_type} />}
+                      <AuthorList authors={paper.authors} />
                       <span className="muted" style={{ fontSize: 13 }}>
                         {new Date(paper.created_at).toLocaleDateString()}
                       </span>

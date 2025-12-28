@@ -8,13 +8,11 @@ interface NavProps {
   profile?: {
     email: string | null;
     role_type: "mentor" | "mentee" | "admin" | "prof";
-    admin_type?: "admin" | "user" | null;
   };
 }
 
 export function Nav({ user, profile }: NavProps) {
-  const isAdmin =
-    profile?.role_type === "admin" || profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   return (
     <nav className="nav">

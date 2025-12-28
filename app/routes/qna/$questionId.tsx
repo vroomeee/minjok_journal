@@ -81,11 +81,11 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type, role_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   if (intent === "replyToQuestion") {
     if (!profile || (profile.role_type !== "mentor" && !isAdmin)) {
@@ -175,7 +175,7 @@ export default function QnaDetail() {
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
 
   const isMentor = profile?.role_type === "mentor";
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   useEffect(() => {
     if (replyFetcher.state === "submitting") {

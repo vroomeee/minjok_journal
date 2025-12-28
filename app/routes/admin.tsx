@@ -9,7 +9,6 @@ type ProfileRow = {
   email: string | null;
   full_name: string | null;
   role_type: "mentor" | "mentee" | "admin" | "prof" | null;
-  admin_type?: "admin" | "user" | null;
   created_at?: string;
 };
 
@@ -19,11 +18,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: me } = await supabase
     .from("profiles")
-    .select("id, admin_type, full_name, email, role_type")
+    .select("id, full_name, email, role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin = me?.role_type === "admin" || me?.admin_type === "admin";
+  const isAdmin = me?.role_type === "admin";
 
   if (!isAdmin) {
     throw new Response("Forbidden", { status: 403 });
@@ -31,7 +30,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role_type, admin_type, created_at")
+    .select("id, email, full_name, role_type, created_at")
     .order("created_at", { ascending: true });
 
   return { profiles: profiles || [], me, user };
@@ -46,11 +45,11 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { data: me } = await supabase
     .from("profiles")
-    .select("admin_type, role_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin = me?.role_type === "admin" || me?.admin_type === "admin";
+  const isAdmin = me?.role_type === "admin";
 
   if (!isAdmin) {
     return { error: "Only admins can update roles" };
@@ -58,20 +57,16 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "update") {
     const targetId = formData.get("userId") as string;
-    const admin_type = formData.get("admin_type") as "admin" | "user" | null;
     const role_type = formData.get("role_type") as "mentor" | "mentee" | "admin" | "prof" | null;
 
     if (!targetId) return { error: "Missing user" };
-    if (admin_type && !["admin", "user"].includes(admin_type)) {
-      return { error: "Invalid admin status" };
-    }
     if (role_type && !["mentor", "mentee", "admin", "prof"].includes(role_type)) {
       return { error: "Invalid role type" };
     }
 
     const { error } = await supabase
       .from("profiles")
-      .update({ admin_type, role_type })
+      .update({ role_type })
       .eq("id", targetId);
     if (error) return { error: "Failed to update user" };
 
@@ -102,7 +97,7 @@ export default function AdminPage() {
             <div>
               <h1 style={{ fontSize: 22, margin: 0 }}>Admin Panel</h1>
               <p className="muted" style={{ margin: 0 }}>
-                Manage user roles and admin access.
+                Manage user roles.
               </p>
             </div>
             <Link to="/" className="btn btn-ghost">
@@ -129,7 +124,6 @@ export default function AdminPage() {
             <div style={{ flex: 2 }}>Name</div>
             <div style={{ flex: 2 }}>Email</div>
             <div style={{ flex: 1 }}>Role</div>
-            <div style={{ flex: 1 }}>Admin</div>
             <div style={{ width: 120 }}>Actions</div>
           </div>
 
@@ -167,18 +161,6 @@ export default function AdminPage() {
                     <option value="mentee">mentee</option>
                     <option value="mentor">mentor</option>
                     <option value="prof">prof</option>
-                    <option value="admin">admin</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <select
-                    name="admin_type"
-                    defaultValue={p.admin_type || "user"}
-                    className="input"
-                    style={{ width: "100%" }}
-                    disabled={isSelf}
-                  >
-                    <option value="user">user</option>
                     <option value="admin">admin</option>
                   </select>
                 </div>

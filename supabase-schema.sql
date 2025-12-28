@@ -11,8 +11,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
 
   -- User roles
-  role_type TEXT CHECK (role_type IN ('mentor', 'mentee')) DEFAULT 'mentee',
-  admin_type TEXT CHECK (admin_type IN ('admin', 'user')) DEFAULT 'user',
+  role_type TEXT CHECK (role_type IN ('mentor', 'mentee', 'prof', 'admin')) DEFAULT 'mentee',
 
   -- Profile info
   email TEXT UNIQUE,
@@ -151,7 +150,7 @@ CREATE POLICY "Authors and admins can delete articles"
   ON articles FOR DELETE
   USING (
     auth.uid() = author_id OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND admin_type = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
   );
 
 -- Article versions: Public read, author can insert/update
@@ -190,19 +189,19 @@ CREATE POLICY "Board posts are viewable by everyone"
 CREATE POLICY "Only admins can create board posts"
   ON board_posts FOR INSERT
   WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND admin_type = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
   );
 
 CREATE POLICY "Only admins can update board posts"
   ON board_posts FOR UPDATE
   USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND admin_type = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
   );
 
 CREATE POLICY "Only admins can delete board posts"
   ON board_posts FOR DELETE
   USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND admin_type = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
   );
 
 -- Q&A Questions: Public read, authenticated write

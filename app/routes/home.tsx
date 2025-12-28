@@ -12,7 +12,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     error,
   } = await supabase.auth.getUser();
 
+  // When there's no session, Supabase returns AuthSessionMissingError. Treat as guest.
   if (error) {
+    if (error.name === "AuthSessionMissingError" || error.status === 400) {
+      return { user: null, profile: null };
+    }
     throw error;
   }
 

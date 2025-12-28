@@ -130,7 +130,7 @@ A complete academic paper review platform built with React Router v7, Supabase, 
 ### Tables
 
 1. **profiles**
-   - User profiles with role_type (mentor/mentee) and admin_type (admin/user)
+   - User profiles with role_type (mentor/mentee/prof/admin)
    - Links to auth.users
    - Includes username, full_name, intro, avatar_url
 
@@ -211,7 +211,7 @@ To use the application:
 
 4. **Create first admin user**:
    - Sign up through the app
-   - Manually update their profile in Supabase to set `admin_type = 'admin'`
+   - Manually update their profile in Supabase to set `role_type = 'admin'`
 
 5. **Test all features**:
    - Upload a paper

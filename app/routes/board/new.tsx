@@ -9,11 +9,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  if (!profile || profile.admin_type !== "admin") {
+  if (!profile || profile.role_type !== "admin") {
     throw new Response("Unauthorized: Admin access required", { status: 403 });
   }
 
@@ -26,11 +26,11 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  if (!profile || profile.admin_type !== "admin") {
+  if (!profile || profile.role_type !== "admin") {
     throw new Response("Unauthorized: Admin access required", { status: 403 });
   }
 

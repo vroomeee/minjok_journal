@@ -19,7 +19,6 @@ export interface Database {
           created_at: string
           updated_at: string
           role_type: "mentor" | "mentee" | "admin" | "prof"
-          admin_type: "admin" | "user" | null
           email: string | null
           full_name: string | null
           intro: string | null
@@ -30,7 +29,6 @@ export interface Database {
           created_at?: string
           updated_at?: string
           role_type?: "mentor" | "mentee" | "admin" | "prof"
-          admin_type?: "admin" | "user" | null
           email?: string | null
           full_name?: string | null
           intro?: string | null
@@ -41,7 +39,6 @@ export interface Database {
           created_at?: string
           updated_at?: string
           role_type?: "mentor" | "mentee" | "admin" | "prof"
-          admin_type?: "admin" | "user" | null
           email?: string | null
           full_name?: string | null
           intro?: string | null
@@ -78,6 +75,32 @@ export interface Database {
           author_id?: string
           status?: "draft" | "in_review" | "published"
           current_version_id?: string | null
+        }
+      }
+      article_authors: {
+        Row: {
+          id: string
+          created_at: string
+          article_id: string
+          profile_id: string
+          is_corresponding: boolean | null
+          position: number | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          article_id: string
+          profile_id: string
+          is_corresponding?: boolean | null
+          position?: number | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          article_id?: string
+          profile_id?: string
+          is_corresponding?: boolean | null
+          position?: number | null
         }
       }
       article_versions: {

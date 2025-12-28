@@ -59,11 +59,11 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type, role_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   if (intent === "replyToQuestion") {
     return { error: "Replies must be posted from the question page." };

@@ -16,6 +16,7 @@ import {
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
+import { AuthorList } from "~/components/author-list";
 
 // Server-side loader to fetch paper details
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -47,8 +48,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         id,
         email,
         full_name,
-        role_type,
-        admin_type
+        role_type
+      ),
+      authors:article_authors (
+        profile_id,
+        profile:profiles!article_authors_profile_id_fkey (
+          id,
+          email,
+          full_name,
+          role_type
+        )
       ),
       versions:article_versions!article_versions_article_id_fkey (
         id,
@@ -130,20 +139,24 @@ export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  if (intent === "delete") {
-    // Check if user is admin or author
+  const getAccess = async () => {
     const { user, profile } = await getUserProfile(request);
-
     const { data: paper } = await supabase
       .from("articles")
-      .select("author_id")
+      .select("author_id, status, authors:article_authors(profile_id)")
       .eq("id", paperId)
       .single();
+    const isAuthor =
+      paper?.author_id === user.id ||
+      paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+    const isAdmin = profile.role_type === "admin";
+    return { user, profile, paper, isAuthor, isAdmin };
+  };
 
-    if (
-      !paper ||
-      (paper.author_id !== user.id && profile.admin_type !== "admin")
-    ) {
+  if (intent === "delete") {
+    const { user, profile, paper, isAuthor, isAdmin } = await getAccess();
+
+    if (!paper || (!isAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -175,17 +188,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "updateStatus") {
     const newStatus = formData.get("status") as string;
 
-    const { user, profile } = await getUserProfile(request);
-    const { data: paper } = await supabase
-      .from("articles")
-      .select("author_id, status")
-      .eq("id", paperId)
-      .single();
+    const { paper, isAuthor, isAdmin } = await getAccess();
 
-    if (
-      !paper ||
-      (paper.author_id !== user.id && profile.admin_type !== "admin")
-    ) {
+    if (!paper || (!isAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -206,18 +211,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "unpublish") {
-    const { user, profile } = await getUserProfile(request);
+    const { paper, isAuthor, isAdmin } = await getAccess();
 
-    const { data: paper } = await supabase
-      .from("articles")
-      .select("author_id, status")
-      .eq("id", paperId)
-      .single();
-
-    if (
-      !paper ||
-      (paper.author_id !== user.id && profile.admin_type !== "admin")
-    ) {
+    if (!paper || (!isAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -238,22 +234,13 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "updateTitle") {
-    const { user, profile } = await getUserProfile(request);
+    const { paper, isAuthor, isAdmin } = await getAccess();
     const newTitle = formData.get("title") as string;
     if (!newTitle) {
       return { error: "Title is required" };
     }
 
-    const { data: paper } = await supabase
-      .from("articles")
-      .select("author_id")
-      .eq("id", paperId)
-      .single();
-
-    if (
-      !paper ||
-      (paper.author_id !== user.id && profile.admin_type !== "admin")
-    ) {
+    if (!paper || (!isAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -326,7 +313,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!comment) return { error: "Comment not found" };
 
     const { user, profile } = await getUserProfile(request);
-    const isAdmin = profile.admin_type === "admin";
+    const isAdmin = profile.role_type === "admin";
     if (comment.author_id !== user.id && !isAdmin) {
       return { error: "Unauthorized" };
     }
@@ -390,8 +377,8 @@ export default function PaperDetail() {
     paper.status !== "published"
   );
 
-  const isAuthor = user?.id === paper.author?.id;
-  const isAdmin = profile?.admin_type === "admin";
+  const isAuthor = paper.authors?.some((a: any) => a.profile_id === user?.id);
+  const isAdmin = profile?.role_type === "admin";
   const canDelete = isAuthor || isAdmin;
   const canPublish = isAuthor || isAdmin;
   const canUploadNewVersion = isAuthor && paper.status !== "published";
@@ -441,10 +428,7 @@ export default function PaperDetail() {
             className="row"
             style={{ flexWrap: "wrap", gap: 12, marginBottom: 8 }}
           >
-            <span className="meta">
-              by <UserLink user={paper.author} />
-            </span>
-            {paper.author && <RoleBadge role={paper.author.role_type} />}
+            <AuthorList authors={paper.authors} showBadges />
             <span className="meta">
               {new Date(paper.created_at).toLocaleDateString()}
             </span>
@@ -693,7 +677,7 @@ export default function PaperDetail() {
                       {new Date(comment.created_at).toLocaleDateString()}
                     </span>
                     {(user?.id === comment.author_id ||
-                      profile?.admin_type === "admin") && (
+                      profile?.role_type === "admin") && (
                       <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                         <commentFetcher.Form method="post">
                           <input

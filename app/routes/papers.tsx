@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
+import { AuthorList } from "~/components/author-list";
 
 // Server-side loader to fetch all published papers
 export async function loader({ request }: Route.LoaderArgs) {
@@ -18,7 +19,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError) {
+  // Missing session can return AuthSessionMissingError; treat as guest.
+  if (authError && authError.name !== "AuthSessionMissingError" && authError.status !== 400) {
     throw authError;
   }
 
@@ -37,11 +39,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select(
       `
       *,
-      author:profiles!author_id (
-        id,
-        email,
-        full_name,
-        role_type
+      authors:article_authors(
+        profile_id,
+        profile:profiles!article_authors_profile_id_fkey(
+          id,
+          email,
+          full_name,
+          role_type
+        )
       )
     `,
       { count: "exact" }
@@ -198,12 +203,12 @@ export default function Papers() {
                     <span className="pill" style={{ background: "#103c2d" }}>
                       Published
                     </span>
-                    {paper.author && (
-                      <RoleBadge role={paper.author.role_type} />
+                    {paper.authors?.[0]?.profile?.role_type && (
+                      <RoleBadge role={paper.authors[0].profile.role_type} />
                     )}
                   </div>
                   <span className="muted" style={{ fontSize: 13 }}>
-                    <UserLink user={paper.author} fallback="Unknown" />
+                    <AuthorList authors={paper.authors} />
                   </span>
                   <span
                     className="muted"

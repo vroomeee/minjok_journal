@@ -22,14 +22,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("id, email, role_type, admin_type")
+      .select("id, email, role_type")
       .eq("id", user.id)
       .single();
     profile = data;
   }
 
-  const isAdmin =
-    profile?.role_type === "admin" || profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   const {
     data: releasedIssues = [],
@@ -48,10 +47,13 @@ export async function loader({ request }: Route.LoaderArgs) {
           article:articles(
             id,
             title,
-            author:profiles!author_id(
-              id,
-              full_name,
-              role_type
+            authors:article_authors(
+              profile_id,
+              profile:profiles!article_authors_profile_id_fkey(
+                id,
+                full_name,
+                role_type
+              )
             )
           )
         )
@@ -129,12 +131,11 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role_type, admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin =
-    profile?.role_type === "admin" || profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   if (!isAdmin) {
     return { error: "Only admins can manage volumes." };

@@ -49,6 +49,10 @@ export default [
   route("board/:postId", "routes/board/$postId.tsx"),
   route("board/:postId/edit", "routes/board/$postId.edit.tsx"),
 
+  // Issues and Volumes
+  route("issues", "routes/issues.tsx"),
+  route("volumes", "routes/volumes.tsx"),
+
   // Admin
   route("admin", "routes/admin.tsx"),
 ] satisfies RouteConfig;

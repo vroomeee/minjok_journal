@@ -4,6 +4,7 @@ import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { UserLink } from "~/components/user-link";
 import { RoleBadge } from "~/components/role-badge";
+import { AuthorList } from "~/components/author-list";
 
 type IssueRecord = {
   id: string;
@@ -24,14 +25,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("id, email, role_type, admin_type")
+      .select("id, email, role_type")
       .eq("id", user.id)
       .single();
     profile = data;
   }
 
-  const isAdmin =
-    profile?.role_type === "admin" || profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   const { data: publishedPapers = [] } = await supabase
     .from("articles")
@@ -41,10 +41,13 @@ export async function loader({ request }: Route.LoaderArgs) {
         title,
         description,
         created_at,
-        author:profiles!author_id (
-          id,
-          full_name,
-          role_type
+        authors:article_authors(
+          profile_id,
+          profile:profiles!article_authors_profile_id_fkey(
+            id,
+            full_name,
+            role_type
+          )
         )
       `
     )
@@ -82,10 +85,13 @@ export async function loader({ request }: Route.LoaderArgs) {
             id,
             title,
             created_at,
-            author:profiles!author_id(
-              id,
-              full_name,
-              role_type
+            authors:article_authors(
+              profile_id,
+              profile:profiles!article_authors_profile_id_fkey(
+                id,
+                full_name,
+                role_type
+              )
             )
           )
         `
@@ -126,12 +132,11 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role_type, admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
 
-  const isAdmin =
-    profile?.role_type === "admin" || profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   if (!isAdmin) {
     return { error: "Only admins can manage issues." };
@@ -325,7 +330,7 @@ export default function IssuesPage() {
                           </span>
                         </div>
                         <div className="muted text-sm">
-                          <UserLink user={paper.author} fallback="Unknown" />
+                          <AuthorList authors={paper.authors} />
                         </div>
                         <div className="muted text-sm" style={{ textAlign: "right" }}>
                           {new Date(paper.created_at).toLocaleDateString()}
@@ -402,10 +407,12 @@ export default function IssuesPage() {
                               <Link to={`/papers/${article.id}`} className="nav-link" style={{ padding: 0 }}>
                                 {article.title}
                               </Link>
-                              <RoleBadge role={article.author?.role_type || "mentee"} />
+                              {article.authors?.[0]?.profile?.role_type && (
+                                <RoleBadge role={article.authors[0].profile.role_type} />
+                              )}
                             </div>
                             <div className="muted text-sm" style={{ textAlign: "right" }}>
-                              <UserLink user={article.author} fallback="Unknown" />
+                              <AuthorList authors={article.authors} />
                             </div>
                           </div>
                         ) : null

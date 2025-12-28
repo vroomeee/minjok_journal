@@ -10,16 +10,25 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: paper, error } = await supabase
     .from("articles")
-    .select("*, author:profiles!author_id(id)")
+    .select("*, authors:article_authors(profile_id)")
     .eq("id", paperId)
     .single();
 
   if (error || !paper) throw new Response("Paper not found", { status: 404 });
-  if (paper.author_id !== user.id) {
+  const isAuthor =
+    paper.author_id === user.id ||
+    paper.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+  if (!isAuthor) {
     throw new Response("Unauthorized: You can only upload versions for your own papers", {
       status: 403,
     });
   }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, role_type")
+    .eq("id", user.id)
+    .single();
 
   const { data: versions } = await supabase
     .from("article_versions")
@@ -30,7 +39,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const nextVersionNumber = versions && versions.length > 0 ? versions[0].version_number + 1 : 1;
 
-  return { paper, nextVersionNumber };
+  return { paper, nextVersionNumber, user, profile };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -61,11 +70,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("author_id")
+    .select("author_id, authors:article_authors(profile_id)")
     .eq("id", paperId)
     .single();
 
-  if (!paper || paper.author_id !== user.id) throw new Response("Unauthorized", { status: 403 });
+  const isAuthor =
+    paper?.author_id === user.id ||
+    paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+  if (!paper || !isAuthor) throw new Response("Unauthorized", { status: 403 });
 
   const { data: versions } = await supabase
     .from("article_versions")
@@ -107,12 +119,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function NewVersion() {
-  const { paper, nextVersionNumber } = useLoaderData<typeof loader>();
+  const { paper, nextVersionNumber, user, profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
     <div className="page">
-      <Nav user={undefined} profile={undefined} />
+      <Nav user={user || undefined} profile={profile || undefined} />
       <div className="page-body" style={{ maxWidth: 720 }}>
         <div className="section">
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>

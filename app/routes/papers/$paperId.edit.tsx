@@ -10,7 +10,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: paper, error } = await supabase
     .from("articles")
-    .select("id, title, description, author_id, status")
+    .select(
+      `
+        id,
+        title,
+        description,
+        author_id,
+        status,
+        authors:article_authors(profile_id)
+      `
+    )
     .eq("id", paperId)
     .single();
 
@@ -18,11 +27,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
-  const isAdmin = profile?.admin_type === "admin";
-  if (paper.author_id !== user.id && !isAdmin) {
+  const isAdmin = profile?.role_type === "admin";
+  const isAuthor =
+    paper.author_id === user.id ||
+    paper.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+  if (!isAuthor && !isAdmin) {
     throw new Response("Unauthorized", { status: 403 });
   }
 
@@ -44,18 +56,21 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("author_id")
+    .select("author_id, authors:article_authors(profile_id)")
     .eq("id", paperId)
     .single();
   if (!paper) throw new Response("Paper not found", { status: 404 });
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
-  const isAdmin = profile?.admin_type === "admin";
-  if (paper.author_id !== user.id && !isAdmin) {
+  const isAdmin = profile?.role_type === "admin";
+  const isAuthor =
+    paper.author_id === user.id ||
+    paper.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+  if (!isAuthor && !isAdmin) {
     throw new Response("Unauthorized", { status: 403 });
   }
 

@@ -38,7 +38,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("*")
+    .select(
+      `
+        *,
+        authors:article_authors(
+          profile_id,
+          profile:profiles!profile_id(
+            id,
+            full_name,
+            email,
+            role_type
+          )
+        )
+      `
+    )
     .eq("id", paperId)
     .single();
 
@@ -126,17 +139,19 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("role_type")
     .eq("id", user.id)
     .single();
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("author_id")
+    .select("author_id, authors:article_authors(profile_id)")
     .eq("id", paperId)
     .single();
-  const isAuthor = paper?.author_id === user.id;
+  const isAuthor =
+    paper?.author_id === user.id ||
+    paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
 
   if ((intent === "updateNotes" || intent === "deleteNotes") && !paper) {
     return { error: "Paper not found" };
@@ -258,7 +273,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!comment) return { error: "Comment not found" };
 
     const { user, profile } = await getUserProfile(request);
-    const isAdmin = profile.admin_type === "admin";
+    const isAdmin = profile.role_type === "admin";
     if (comment.author_id !== user.id && !isAdmin) {
       return { error: "Unauthorized" };
     }
@@ -333,8 +348,10 @@ export default function VersionReview() {
       handledCommentSuccess.current = true;
     }
   }, [commentFetcher.state, commentFetcher.data, revalidator]);
-  const isAdmin = profile?.admin_type === "admin";
-  const isAuthor = user?.id === paper?.author_id;
+  const isAdmin = profile?.role_type === "admin";
+  const isAuthor = paper?.authors?.some(
+    (a: { profile_id: string }) => a.profile_id === user?.id
+  );
   const canEditNotes = isAdmin || isAuthor;
   const canDeleteVersion = isAdmin || isAuthor;
   const deleteWarning =

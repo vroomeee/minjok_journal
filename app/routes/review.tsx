@@ -3,6 +3,7 @@ import type { Route } from "./+types/review";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
+import { AuthorList } from "~/components/author-list";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -37,11 +38,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select(
       `
       *,
-      author:profiles!author_id (
-        id,
-        email,
-        full_name,
-        role_type
+      authors:article_authors(
+        profile_id,
+        profile:profiles!profile_id(
+          id,
+          email,
+          full_name,
+          role_type
+        )
       ),
       current_version:article_versions!current_version_id (
         id,
@@ -105,11 +109,9 @@ export default function ReviewQueue() {
                       </h3>
                     </Link>
                     <div className="row" style={{ gap: 8, marginTop: 4 }}>
-                      <span className="muted" style={{ fontSize: 13 }}>
-                        by {paper.author?.email || paper.author?.full_name}
-                      </span>
-                      {paper.author && (
-                        <RoleBadge role={paper.author.role_type} />
+                      <AuthorList authors={paper.authors} />
+                      {paper.authors?.[0]?.profile?.role_type && (
+                        <RoleBadge role={paper.authors[0].profile.role_type} />
                       )}
                       <span className="muted" style={{ fontSize: 13 }}>
                         Submitted:{" "}

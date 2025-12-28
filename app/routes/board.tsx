@@ -35,8 +35,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         id,
         email,
         full_name,
-        role_type,
-        admin_type
+        role_type
       )
     `,
       { count: "exact" }
@@ -68,7 +67,7 @@ export default function Board() {
     useLoaderData<typeof loader>();
   const perPage = 6;
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
@@ -171,9 +170,11 @@ export default function Board() {
                     <Link to={`/board/${post.id}`} className="nav-link" style={{ padding: 0 }}>
                       <h3 style={{ margin: 0, fontSize: 15, color: "var(--text)" }}>{post.title}</h3>
                     </Link>
-                    <div className="row" style={{ gap: 6, marginTop: 2 }}>
-                      <span className="pill">{post.author?.admin_type === "admin" ? "중요" : "일반"}</span>
-                    </div>
+                    {post.author?.role_type === "admin" && (
+                      <div className="row" style={{ gap: 6, marginTop: 2 }}>
+                        <span className="pill">Admin</span>
+                      </div>
+                    )}
                   </div>
                   <span className="muted" style={{ fontSize: 13 }}>
                     <UserLink user={post.author} fallback="Unknown" />
@@ -209,7 +210,6 @@ export default function Board() {
             )}
           </>
         )}
-
       </div>
     </div>
   );

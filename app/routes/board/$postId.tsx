@@ -40,8 +40,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         id,
         email,
         full_name,
-        role_type,
-        admin_type
+        role_type
       )
     `
     )
@@ -85,11 +84,11 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("admin_type, id")
+    .select("role_type, id")
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
 
   if (intent === "delete") {
     const { data: post } = await supabase
@@ -140,10 +139,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("admin_type")
+      .select("role_type")
       .eq("id", user.id)
       .single();
-    const isAdminComment = profile?.admin_type === "admin";
+    const isAdminComment = profile?.role_type === "admin";
     if (comment.author_id !== user.id && !isAdminComment) {
       return { error: "Unauthorized" };
     }
@@ -183,7 +182,7 @@ export default function BoardPost() {
 
   const { post, comments, user, profile } = useLoaderData<typeof loader>();
 
-  const isAdmin = profile?.admin_type === "admin";
+  const isAdmin = profile?.role_type === "admin";
   const isAuthor = user?.id === post.author?.id;
   const canEdit = isAdmin || isAuthor;
   const canDelete = isAdmin || isAuthor;
@@ -249,7 +248,7 @@ export default function BoardPost() {
               Posted by <UserLink user={post.author} />
             </span>
             {post.author && <RoleBadge role={post.author.role_type} />}
-            {post.author?.admin_type === "admin" && (
+            {post.author?.role_type === "admin" && (
               <span className="pill">Admin</span>
             )}
             <span className="meta">
@@ -338,7 +337,7 @@ export default function BoardPost() {
                     {new Date(comment.created_at).toLocaleDateString()}
                   </span>
                   {(user?.id === comment.author_id ||
-                    profile?.admin_type === "admin") && (
+                    profile?.role_type === "admin") && (
                     <div className="row" style={{ gap: 6 }}>
                       <commentFetcher.Form method="post">
                         <input
