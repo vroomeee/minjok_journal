@@ -1,7 +1,18 @@
-import { Link, useLoaderData, Form, redirect, useActionData, useFetcher, useRevalidator } from "react-router";
+import {
+  Link,
+  useLoaderData,
+  Form,
+  redirect,
+  useActionData,
+  useFetcher,
+  useRevalidator,
+} from "react-router";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/$paperId";
-import { createSupabaseServerClient, getUserProfile } from "~/lib/supabase.server";
+import {
+  createSupabaseServerClient,
+  getUserProfile,
+} from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
@@ -129,7 +140,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       .eq("id", paperId)
       .single();
 
-    if (!paper || (paper.author_id !== user.id && profile.admin_type !== "admin")) {
+    if (
+      !paper ||
+      (paper.author_id !== user.id && profile.admin_type !== "admin")
+    ) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -139,7 +153,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       .select("storage_path")
       .eq("article_id", paperId);
     const pathsToRemove =
-      versionPaths?.map((v: { storage_path: string | null }) => v.storage_path).filter(Boolean) || [];
+      versionPaths
+        ?.map((v: { storage_path: string | null }) => v.storage_path)
+        .filter(Boolean) || [];
     if (pathsToRemove.length > 0) {
       await supabase.storage.from("articles").remove(pathsToRemove as string[]);
     }
@@ -166,7 +182,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       .eq("id", paperId)
       .single();
 
-    if (!paper || (paper.author_id !== user.id && profile.admin_type !== "admin")) {
+    if (
+      !paper ||
+      (paper.author_id !== user.id && profile.admin_type !== "admin")
+    ) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -195,7 +214,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       .eq("id", paperId)
       .single();
 
-    if (!paper || (paper.author_id !== user.id && profile.admin_type !== "admin")) {
+    if (
+      !paper ||
+      (paper.author_id !== user.id && profile.admin_type !== "admin")
+    ) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -228,7 +250,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       .eq("id", paperId)
       .single();
 
-    if (!paper || (paper.author_id !== user.id && profile.admin_type !== "admin")) {
+    if (
+      !paper ||
+      (paper.author_id !== user.id && profile.admin_type !== "admin")
+    ) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -307,7 +332,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     if (intent === "deleteComment") {
-      const { error } = await supabase.from("comments").delete().eq("id", commentId);
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId);
       if (error) return { error: "Failed to delete comment" };
       return { success: true };
     }
@@ -315,7 +343,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     const body = formData.get("body") as string;
     if (!body) return { error: "Comment body is required" };
 
-    const { error } = await supabase.from("comments").update({ body }).eq("id", commentId);
+    const { error } = await supabase
+      .from("comments")
+      .update({ body })
+      .eq("id", commentId);
     if (error) return { error: "Failed to update comment" };
     return { success: true };
   }
@@ -324,8 +355,15 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PaperDetail() {
-  const { paper, user, profile, comments, activeVersionId, publishedVersion, publishedFileUrl } =
-    useLoaderData<typeof loader>();
+  const {
+    paper,
+    user,
+    profile,
+    comments,
+    activeVersionId,
+    publishedVersion,
+    publishedFileUrl,
+  } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const commentFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
@@ -348,7 +386,9 @@ export default function PaperDetail() {
     }
   }, [commentFetcher.state, commentFetcher.data, revalidator]);
 
-  const [showVersions, setShowVersions] = useState(paper.status !== "published");
+  const [showVersions, setShowVersions] = useState(
+    paper.status !== "published"
+  );
 
   const isAuthor = user?.id === paper.author?.id;
   const isAdmin = profile?.admin_type === "admin";
@@ -376,7 +416,10 @@ export default function PaperDetail() {
         )}
 
         <div className="section">
-          <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", marginBottom: 8 }}
+          >
             <div className="row" style={{ gap: 10 }}>
               <h1 style={{ fontSize: 26 }}>{paper.title}</h1>
               {(isAuthor || isAdmin) && (
@@ -389,17 +432,22 @@ export default function PaperDetail() {
               {paper.status === "published"
                 ? "Published"
                 : paper.status === "in_review"
-                ? "In Review"
-                : "Draft"}
+                  ? "In Review"
+                  : "Draft"}
             </span>
           </div>
 
-          <div className="row" style={{ flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
+          <div
+            className="row"
+            style={{ flexWrap: "wrap", gap: 12, marginBottom: 8 }}
+          >
             <span className="meta">
               by <UserLink user={paper.author} />
             </span>
             {paper.author && <RoleBadge role={paper.author.role_type} />}
-            <span className="meta">{new Date(paper.created_at).toLocaleDateString()}</span>
+            <span className="meta">
+              {new Date(paper.created_at).toLocaleDateString()}
+            </span>
           </div>
           {paper.description && (
             <p className="muted" style={{ marginBottom: 12 }}>
@@ -419,12 +467,18 @@ export default function PaperDetail() {
                 </Form>
               )}
               {isAuthor && canUploadNewVersion && (
-                <Link to={`/papers/${paper.id}/new-version`} className="btn btn-ghost">
+                <Link
+                  to={`/papers/${paper.id}/new-version`}
+                  className="btn btn-ghost"
+                >
                   Upload New Version
                 </Link>
               )}
               {canPublish && paper.status === "in_review" && (
-                <Link to={`/papers/${paper.id}/publish`} className="btn btn-accent">
+                <Link
+                  to={`/papers/${paper.id}/publish`}
+                  className="btn btn-accent"
+                >
                   Publish
                 </Link>
               )}
@@ -456,7 +510,10 @@ export default function PaperDetail() {
         </div>
 
         <div className="section">
-          <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", marginBottom: 12 }}
+          >
             <h2 style={{ fontSize: 18 }}>Versions</h2>
             {paper.status === "published" && (
               <button
@@ -483,7 +540,10 @@ export default function PaperDetail() {
                         borderRadius: "6px",
                       }}
                     >
-                      <div className="row" style={{ justifyContent: "space-between" }}>
+                      <div
+                        className="row"
+                        style={{ justifyContent: "space-between" }}
+                      >
                         <div>
                           <div className="row" style={{ gap: 6 }}>
                             <h3 style={{ fontSize: 15, margin: 0 }}>
@@ -491,7 +551,10 @@ export default function PaperDetail() {
                             </h3>
                             {paper.current_version_id === version.id &&
                               paper.status === "published" && (
-                                <span className="pill" style={{ background: "#103c2d" }}>
+                                <span
+                                  className="pill"
+                                  style={{ background: "#103c2d" }}
+                                >
                                   Published
                                 </span>
                               )}
@@ -531,7 +594,8 @@ export default function PaperDetail() {
               <div>
                 <h2 style={{ fontSize: 18 }}>Published Version</h2>
                 <p className="muted">
-                  {publishedVersion.file_name} (v{publishedVersion.version_number})
+                  {publishedVersion.file_name} (v
+                  {publishedVersion.version_number})
                 </p>
               </div>
               {publishedFileUrl && (
@@ -551,7 +615,11 @@ export default function PaperDetail() {
                   <iframe
                     src={publishedFileUrl}
                     className="w-full"
-                    style={{ height: 520, border: `1px solid var(--border)`, borderRadius: 6 }}
+                    style={{
+                      height: 520,
+                      border: `1px solid var(--border)`,
+                      borderRadius: 6,
+                    }}
                     title="Published File"
                   />
                 </div>
@@ -571,10 +639,8 @@ export default function PaperDetail() {
                     commentFormsRef.current.push(form);
                   }
                 }}
-                onSubmit={(e) => {
+                onSubmit={() => {
                   handledCommentSuccess.current = false;
-                  // Clear immediately for better UX; fetcher will still submit values already serialized
-                  e.currentTarget.reset();
                 }}
                 data-comment-form
               >
@@ -592,7 +658,9 @@ export default function PaperDetail() {
                   style={{ marginTop: 8 }}
                   disabled={commentFetcher.state === "submitting"}
                 >
-                  {commentFetcher.state === "submitting" ? "Posting..." : "Post Comment"}
+                  {commentFetcher.state === "submitting"
+                    ? "Posting..."
+                    : "Post Comment"}
                 </button>
               </commentFetcher.Form>
             ) : (
@@ -603,8 +671,15 @@ export default function PaperDetail() {
 
             <div className="card-grid">
               {comments.map((comment) => (
-                <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
-                  <div className="row" style={{ gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                <div
+                  key={comment.id}
+                  className="section-compact"
+                  style={{ borderRadius: 6 }}
+                >
+                  <div
+                    className="row"
+                    style={{ gap: 8, marginBottom: 4, flexWrap: "wrap" }}
+                  >
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
                       <UserLink user={comment.author} />
                     </span>
@@ -617,15 +692,27 @@ export default function PaperDetail() {
                     <span className="meta">
                       {new Date(comment.created_at).toLocaleDateString()}
                     </span>
-                    {(user?.id === comment.author_id || profile?.admin_type === "admin") && (
+                    {(user?.id === comment.author_id ||
+                      profile?.admin_type === "admin") && (
                       <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                         <commentFetcher.Form method="post">
-                          <input type="hidden" name="intent" value="deleteComment" />
-                          <input type="hidden" name="commentId" value={comment.id} />
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="deleteComment"
+                          />
+                          <input
+                            type="hidden"
+                            name="commentId"
+                            value={comment.id}
+                          />
                           <button
                             type="submit"
                             className="btn btn-ghost"
-                            onClick={(e) => !confirm("Delete this comment?") && e.preventDefault()}
+                            onClick={(e) =>
+                              !confirm("Delete this comment?") &&
+                              e.preventDefault()
+                            }
                           >
                             Delete
                           </button>
@@ -639,13 +726,24 @@ export default function PaperDetail() {
                             className="list"
                             style={{ marginTop: 6 }}
                             ref={(form) => {
-                              if (form && !editCommentFormsRef.current.includes(form)) {
+                              if (
+                                form &&
+                                !editCommentFormsRef.current.includes(form)
+                              ) {
                                 editCommentFormsRef.current.push(form);
                               }
                             }}
                           >
-                            <input type="hidden" name="intent" value="editComment" />
-                            <input type="hidden" name="commentId" value={comment.id} />
+                            <input
+                              type="hidden"
+                              name="intent"
+                              value="editComment"
+                            />
+                            <input
+                              type="hidden"
+                              name="commentId"
+                              value={comment.id}
+                            />
                             <textarea
                               name="body"
                               defaultValue={comment.body}
@@ -660,7 +758,9 @@ export default function PaperDetail() {
                               style={{ marginTop: 4 }}
                               disabled={commentFetcher.state === "submitting"}
                             >
-                              {commentFetcher.state === "submitting" ? "Saving..." : "Save"}
+                              {commentFetcher.state === "submitting"
+                                ? "Saving..."
+                                : "Save"}
                             </button>
                           </commentFetcher.Form>
                         </details>
@@ -674,7 +774,9 @@ export default function PaperDetail() {
               ))}
 
               {comments.length === 0 && (
-                <p className="muted">No comments yet. Share your thoughts on this paper.</p>
+                <p className="muted">
+                  No comments yet. Share your thoughts on this paper.
+                </p>
               )}
             </div>
           </div>

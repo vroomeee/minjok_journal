@@ -8,8 +8,8 @@ type ProfileRow = {
   id: string;
   email: string | null;
   full_name: string | null;
-  role_type: "mentor" | "mentee" | null;
-  admin_type: "admin" | "user" | null;
+  role_type: "mentor" | "mentee" | "admin" | "prof" | null;
+  admin_type?: "admin" | "user" | null;
   created_at?: string;
 };
 
@@ -23,7 +23,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("id", user.id)
     .single();
 
-  if (me?.admin_type !== "admin") {
+  const isAdmin = me?.role_type === "admin" || me?.admin_type === "admin";
+
+  if (!isAdmin) {
     throw new Response("Forbidden", { status: 403 });
   }
 
@@ -44,24 +46,26 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { data: me } = await supabase
     .from("profiles")
-    .select("admin_type")
+    .select("admin_type, role_type")
     .eq("id", user.id)
     .single();
 
-  if (me?.admin_type !== "admin") {
+  const isAdmin = me?.role_type === "admin" || me?.admin_type === "admin";
+
+  if (!isAdmin) {
     return { error: "Only admins can update roles" };
   }
 
   if (intent === "update") {
     const targetId = formData.get("userId") as string;
     const admin_type = formData.get("admin_type") as "admin" | "user" | null;
-    const role_type = formData.get("role_type") as "mentor" | "mentee" | null;
+    const role_type = formData.get("role_type") as "mentor" | "mentee" | "admin" | "prof" | null;
 
     if (!targetId) return { error: "Missing user" };
     if (admin_type && !["admin", "user"].includes(admin_type)) {
       return { error: "Invalid admin status" };
     }
-    if (role_type && !["mentor", "mentee"].includes(role_type)) {
+    if (role_type && !["mentor", "mentee", "admin", "prof"].includes(role_type)) {
       return { error: "Invalid role type" };
     }
 
@@ -162,6 +166,8 @@ export default function AdminPage() {
                   >
                     <option value="mentee">mentee</option>
                     <option value="mentor">mentor</option>
+                    <option value="prof">prof</option>
+                    <option value="admin">admin</option>
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>

@@ -36,7 +36,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     profile = data;
   }
 
-  const { data: paper } = await supabase.from("articles").select("*").eq("id", paperId).single();
+  const { data: paper } = await supabase
+    .from("articles")
+    .select("*")
+    .eq("id", paperId)
+    .single();
 
   const { data: version, error: versionError } = await supabase
     .from("article_versions")
@@ -139,7 +143,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "deleteVersion") {
-    if (!paper || (!isAuthor && !isAdmin)) return { error: "Unauthorized to delete this version" };
+    if (!paper || (!isAuthor && !isAdmin))
+      return { error: "Unauthorized to delete this version" };
 
     const { data: versions } = await supabase
       .from("article_versions")
@@ -147,7 +152,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       .eq("article_id", paperId)
       .order("version_number", { ascending: false });
 
-    if (!versions || versions.length === 0) return { error: "No versions found for this paper" };
+    if (!versions || versions.length === 0)
+      return { error: "No versions found for this paper" };
     const targetVersion = versions.find((v) => v.id === versionId);
     if (!targetVersion) return { error: "Version not found" };
 
@@ -155,10 +161,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       .from("comments")
       .delete()
       .eq("version_id", versionId);
-    if (deleteCommentsError) return { error: "Failed to delete comments for this version" };
+    if (deleteCommentsError)
+      return { error: "Failed to delete comments for this version" };
 
     // Remove storage objects for this version (and all if deleting last)
-    const targetPath = targetVersion.storage_path ? [targetVersion.storage_path] : [];
+    const targetPath = targetVersion.storage_path
+      ? [targetVersion.storage_path]
+      : [];
     const allPaths = versions
       .map((v) => v.storage_path)
       .filter((p): p is string => Boolean(p));
@@ -174,8 +183,12 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (deletePaperCommentsError)
         return { error: "Version deleted but failed to delete paper comments" };
 
-      const { error: deleteArticleError } = await db.from("articles").delete().eq("id", paperId);
-      if (deleteArticleError) return { error: "Version deleted but failed to delete paper" };
+      const { error: deleteArticleError } = await db
+        .from("articles")
+        .delete()
+        .eq("id", paperId);
+      if (deleteArticleError)
+        return { error: "Version deleted but failed to delete paper" };
 
       const { error: deleteVersionError } = await db
         .from("article_versions")
@@ -191,13 +204,15 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const fallbackVersion = versions.find((v) => v.id !== versionId);
-    if (!fallbackVersion) return { error: "Could not determine fallback version" };
+    if (!fallbackVersion)
+      return { error: "Could not determine fallback version" };
 
     const { error: updateArticleError } = await db
       .from("articles")
       .update({ current_version_id: fallbackVersion.id })
       .eq("id", paperId);
-    if (updateArticleError) return { error: "Failed to update paper to fallback version" };
+    if (updateArticleError)
+      return { error: "Failed to update paper to fallback version" };
 
     const { error: deleteVersionError } = await db
       .from("article_versions")
@@ -209,10 +224,13 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "updateNotes" || intent === "deleteNotes") {
-    if (!paper || (!isAuthor && !isAdmin)) return { error: "Unauthorized to edit notes" };
+    if (!paper || (!isAuthor && !isAdmin))
+      return { error: "Unauthorized to edit notes" };
 
     const notesValue =
-      intent === "deleteNotes" ? null : ((formData.get("notes") as string | null) || null);
+      intent === "deleteNotes"
+        ? null
+        : (formData.get("notes") as string | null) || null;
 
     const { error: updateError } = await db
       .from("article_versions")
@@ -246,7 +264,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     if (intent === "deleteComment") {
-      const { error } = await supabase.from("comments").delete().eq("id", commentId);
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId);
       if (error) return { error: "Failed to delete comment" };
       return { success: true };
     }
@@ -254,7 +275,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     const newBody = formData.get("body") as string;
     if (!newBody) return { error: "Comment body is required" };
 
-    const { error } = await supabase.from("comments").update({ body: newBody }).eq("id", commentId);
+    const { error } = await supabase
+      .from("comments")
+      .update({ body: newBody })
+      .eq("id", commentId);
     if (error) return { error: "Failed to update comment" };
     return { success: true };
   }
@@ -276,8 +300,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 export default function VersionReview() {
   const formRef = useRef<HTMLFormElement>(null);
-  const { paper, version, fileUrl, comments, replies, user, profile, totalVersions } =
-    useLoaderData<typeof loader>();
+  const {
+    paper,
+    version,
+    fileUrl,
+    comments,
+    replies,
+    user,
+    profile,
+    totalVersions,
+  } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const commentFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
@@ -310,7 +342,9 @@ export default function VersionReview() {
       ? "WARNING: this is the only version of the paper. If you delete this, the paper will be deleted as well."
       : "Delete this version?";
   const truncatedNotes =
-    version.notes && version.notes.length > 200 ? `${version.notes.slice(0, 200)}...` : version.notes;
+    version.notes && version.notes.length > 200
+      ? `${version.notes.slice(0, 200)}...`
+      : version.notes;
 
   return (
     <div className="page">
@@ -351,7 +385,10 @@ export default function VersionReview() {
             )}
           </div>
 
-          <div className="row" style={{ gap: 12, flexWrap: "wrap", marginTop: 6 }}>
+          <div
+            className="row"
+            style={{ gap: 12, flexWrap: "wrap", marginTop: 6 }}
+          >
             <span className="meta">File: {version.file_name}</span>
             {version.notes && (
               <span className="muted" style={{ fontStyle: "italic" }}>
@@ -379,7 +416,10 @@ export default function VersionReview() {
                   {version.notes && (
                     <Form
                       method="post"
-                      onSubmit={(e) => !confirm("Remove the notes for this version?") && e.preventDefault()}
+                      onSubmit={(e) =>
+                        !confirm("Remove the notes for this version?") &&
+                        e.preventDefault()
+                      }
                     >
                       <input type="hidden" name="intent" value="deleteNotes" />
                       <button type="submit" className="btn btn-ghost">
@@ -393,7 +433,12 @@ export default function VersionReview() {
           )}
 
           <div className="row" style={{ gap: 10, marginTop: 12 }}>
-            <a href={fileUrl} className="btn btn-accent" target="_blank" rel="noopener noreferrer">
+            <a
+              href={fileUrl}
+              className="btn btn-accent"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Download / View File
             </a>
           </div>
@@ -403,7 +448,11 @@ export default function VersionReview() {
               <iframe
                 src={fileUrl}
                 className="w-full"
-                style={{ height: 520, border: `1px solid var(--border)`, borderRadius: 6 }}
+                style={{
+                  height: 520,
+                  border: `1px solid var(--border)`,
+                  borderRadius: 6,
+                }}
                 title="PDF Viewer"
               />
             </div>
@@ -426,7 +475,6 @@ export default function VersionReview() {
               style={{ marginBottom: 12 }}
               onSubmit={(e) => {
                 handledCommentSuccess.current = false;
-                e.currentTarget.reset();
               }}
             >
               <input type="hidden" name="intent" value="addComment" />
@@ -442,7 +490,9 @@ export default function VersionReview() {
                 className="btn btn-accent"
                 disabled={commentFetcher.state === "submitting"}
               >
-                {commentFetcher.state === "submitting" ? "Posting..." : "Post Comment"}
+                {commentFetcher.state === "submitting"
+                  ? "Posting..."
+                  : "Post Comment"}
               </button>
             </commentFetcher.Form>
           ) : (
@@ -452,17 +502,26 @@ export default function VersionReview() {
           )}
 
           <div className="card-grid">
-              {comments.map((comment) => {
-                const commentReplies = replies.filter((r) => r.parent_id === comment.id);
+            {comments.map((comment) => {
+              const commentReplies = replies.filter(
+                (r) => r.parent_id === comment.id
+              );
 
-                return (
-                  <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
+              return (
+                <div
+                  key={comment.id}
+                  className="section-compact"
+                  style={{ borderRadius: 6 }}
+                >
                   <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
                       <UserLink user={comment.author} />
                     </span>
                     {comment.author && (
-                      <RoleBadge role={comment.author.role_type} className="text-xs py-0 px-1" />
+                      <RoleBadge
+                        role={comment.author.role_type}
+                        className="text-xs py-0 px-1"
+                      />
                     )}
                     <span className="meta">
                       {new Date(comment.created_at).toLocaleDateString()}
@@ -470,12 +529,23 @@ export default function VersionReview() {
                     {(user?.id === comment.author_id || isAdmin) && (
                       <div className="row" style={{ gap: 6 }}>
                         <commentFetcher.Form method="post">
-                          <input type="hidden" name="intent" value="deleteComment" />
-                          <input type="hidden" name="commentId" value={comment.id} />
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="deleteComment"
+                          />
+                          <input
+                            type="hidden"
+                            name="commentId"
+                            value={comment.id}
+                          />
                           <button
                             type="submit"
                             className="btn btn-ghost"
-                            onClick={(e) => !confirm("Delete this comment?") && e.preventDefault()}
+                            onClick={(e) =>
+                              !confirm("Delete this comment?") &&
+                              e.preventDefault()
+                            }
                           >
                             Delete
                           </button>
@@ -489,13 +559,24 @@ export default function VersionReview() {
                             className="list"
                             style={{ marginTop: 6 }}
                             ref={(form) => {
-                              if (form && !editCommentFormsRef.current.includes(form)) {
+                              if (
+                                form &&
+                                !editCommentFormsRef.current.includes(form)
+                              ) {
                                 editCommentFormsRef.current.push(form);
                               }
                             }}
                           >
-                            <input type="hidden" name="intent" value="editComment" />
-                            <input type="hidden" name="commentId" value={comment.id} />
+                            <input
+                              type="hidden"
+                              name="intent"
+                              value="editComment"
+                            />
+                            <input
+                              type="hidden"
+                              name="commentId"
+                              value={comment.id}
+                            />
                             <textarea
                               name="body"
                               defaultValue={comment.body}
@@ -510,7 +591,9 @@ export default function VersionReview() {
                               style={{ marginTop: 4 }}
                               disabled={commentFetcher.state === "submitting"}
                             >
-                              {commentFetcher.state === "submitting" ? "Saving..." : "Save"}
+                              {commentFetcher.state === "submitting"
+                                ? "Saving..."
+                                : "Save"}
                             </button>
                           </commentFetcher.Form>
                         </details>
@@ -524,7 +607,11 @@ export default function VersionReview() {
                   {commentReplies.length > 0 && (
                     <div className="card-grid" style={{ marginTop: 8 }}>
                       {commentReplies.map((reply) => (
-                        <div key={reply.id} className="section-compact" style={{ background: "var(--surface-2)" }}>
+                        <div
+                          key={reply.id}
+                          className="section-compact"
+                          style={{ background: "var(--surface-2)" }}
+                        >
                           <div className="row" style={{ gap: 6 }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>
                               <UserLink user={reply.author} />
@@ -562,11 +649,14 @@ export default function VersionReview() {
                         }}
                         onSubmit={(e) => {
                           handledCommentSuccess.current = false;
-                          e.currentTarget.reset();
                         }}
                       >
                         <input type="hidden" name="intent" value="addComment" />
-                        <input type="hidden" name="parentId" value={comment.id} />
+                        <input
+                          type="hidden"
+                          name="parentId"
+                          value={comment.id}
+                        />
                         <textarea
                           name="body"
                           rows={2}
@@ -580,7 +670,9 @@ export default function VersionReview() {
                           style={{ marginTop: 6 }}
                           disabled={commentFetcher.state === "submitting"}
                         >
-                          {commentFetcher.state === "submitting" ? "Posting..." : "Reply"}
+                          {commentFetcher.state === "submitting"
+                            ? "Posting..."
+                            : "Reply"}
                         </button>
                       </commentFetcher.Form>
                     </details>

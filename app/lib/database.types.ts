@@ -18,8 +18,8 @@ export interface Database {
           id: string
           created_at: string
           updated_at: string
-          role_type: "mentor" | "mentee"
-          admin_type: "admin" | "user"
+          role_type: "mentor" | "mentee" | "admin" | "prof"
+          admin_type: "admin" | "user" | null
           email: string | null
           full_name: string | null
           intro: string | null
@@ -29,8 +29,8 @@ export interface Database {
           id: string
           created_at?: string
           updated_at?: string
-          role_type?: "mentor" | "mentee"
-          admin_type?: "admin" | "user"
+          role_type?: "mentor" | "mentee" | "admin" | "prof"
+          admin_type?: "admin" | "user" | null
           email?: string | null
           full_name?: string | null
           intro?: string | null
@@ -40,8 +40,8 @@ export interface Database {
           id?: string
           created_at?: string
           updated_at?: string
-          role_type?: "mentor" | "mentee"
-          admin_type?: "admin" | "user"
+          role_type?: "mentor" | "mentee" | "admin" | "prof"
+          admin_type?: "admin" | "user" | null
           email?: string | null
           full_name?: string | null
           intro?: string | null
@@ -54,6 +54,7 @@ export interface Database {
           created_at: string
           updated_at: string
           title: string
+          description: string | null
           author_id: string
           status: "draft" | "in_review" | "published"
           current_version_id: string | null
@@ -63,6 +64,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           title: string
+          description?: string | null
           author_id: string
           status?: "draft" | "in_review" | "published"
           current_version_id?: string | null
@@ -72,6 +74,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           title?: string
+          description?: string | null
           author_id?: string
           status?: "draft" | "in_review" | "published"
           current_version_id?: string | null
@@ -217,6 +220,110 @@ export interface Database {
           question_id?: string
           author_id?: string
           content?: string
+        }
+      }
+      issues: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          title: string
+          description: string | null
+          status: "draft" | "released"
+          release_date: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title: string
+          description?: string | null
+          status?: "draft" | "released"
+          release_date?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title?: string
+          description?: string | null
+          status?: "draft" | "released"
+          release_date?: string | null
+        }
+      }
+      issue_articles: {
+        Row: {
+          id: string
+          created_at: string
+          issue_id: string
+          article_id: string
+          position: number | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          issue_id: string
+          article_id: string
+          position?: number | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          issue_id?: string
+          article_id?: string
+          position?: number | null
+        }
+      }
+      volumes: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          title: string
+          description: string | null
+          status: "draft" | "released"
+          release_date: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title: string
+          description?: string | null
+          status?: "draft" | "released"
+          release_date?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title?: string
+          description?: string | null
+          status?: "draft" | "released"
+          release_date?: string | null
+        }
+      }
+      volume_issues: {
+        Row: {
+          id: string
+          created_at: string
+          volume_id: string
+          issue_id: string
+          position: number | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          volume_id: string
+          issue_id: string
+          position?: number | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          volume_id?: string
+          issue_id?: string
+          position?: number | null
         }
       }
     }

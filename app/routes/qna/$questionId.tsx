@@ -1,4 +1,12 @@
-import { Form, Link, redirect, useActionData, useLoaderData, useFetcher, useRevalidator } from "react-router";
+import {
+  Form,
+  Link,
+  redirect,
+  useActionData,
+  useLoaderData,
+  useFetcher,
+  useRevalidator,
+} from "react-router";
 import type { Route } from "./+types/$questionId";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -103,7 +111,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!question || (question.author_id !== user.id && !isAdmin)) {
       return { error: "Unauthorized to delete this question" };
     }
-    const { error } = await supabase.from("qna_questions").delete().eq("id", questionId);
+    const { error } = await supabase
+      .from("qna_questions")
+      .delete()
+      .eq("id", questionId);
     if (error) return { error: "Failed to delete question" };
     return redirect("/qna");
   }
@@ -118,7 +129,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!reply || (reply.author_id !== user.id && !isAdmin)) {
       return { error: "Unauthorized to delete this reply" };
     }
-    const { error } = await supabase.from("qna_replies").delete().eq("id", replyId);
+    const { error } = await supabase
+      .from("qna_replies")
+      .delete()
+      .eq("id", replyId);
     if (error) return { error: "Failed to delete reply" };
     return { success: true };
   }
@@ -138,7 +152,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Unauthorized to edit this reply" };
     }
 
-    const { error } = await supabase.from("qna_replies").update({ content }).eq("id", replyId);
+    const { error } = await supabase
+      .from("qna_replies")
+      .update({ content })
+      .eq("id", replyId);
     if (error) return { error: "Failed to update reply" };
     return { success: true };
   }
@@ -188,7 +205,9 @@ export default function QnaDetail() {
                 <span className="muted">
                   Asked by <UserLink user={question.author} />
                 </span>
-                {question.author && <RoleBadge role={question.author.role_type} />}
+                {question.author && (
+                  <RoleBadge role={question.author.role_type} />
+                )}
                 <span className="muted">
                   {new Date(question.created_at).toLocaleDateString()}
                 </span>
@@ -206,7 +225,9 @@ export default function QnaDetail() {
                   <button
                     type="submit"
                     className="btn btn-danger"
-                    onClick={(e) => !confirm("Delete this question?") && e.preventDefault()}
+                    onClick={(e) =>
+                      !confirm("Delete this question?") && e.preventDefault()
+                    }
                   >
                     Delete
                   </button>
@@ -214,7 +235,10 @@ export default function QnaDetail() {
               )}
             </div>
           </div>
-          <p className="muted" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
+          <p
+            className="muted"
+            style={{ marginTop: 10, whiteSpace: "pre-wrap" }}
+          >
             {question.content}
           </p>
         </div>
@@ -238,7 +262,6 @@ export default function QnaDetail() {
               ref={replyFormRef}
               onSubmit={(e) => {
                 handledReplySuccess.current = false;
-                e.currentTarget.reset();
               }}
             >
               <input type="hidden" name="intent" value="replyToQuestion" />
@@ -255,7 +278,9 @@ export default function QnaDetail() {
                 style={{ marginTop: 8 }}
                 disabled={replyFetcher.state === "submitting"}
               >
-                {replyFetcher.state === "submitting" ? "Posting..." : "Post Reply"}
+                {replyFetcher.state === "submitting"
+                  ? "Posting..."
+                  : "Post Reply"}
               </button>
             </replyFetcher.Form>
           )}
@@ -263,13 +288,19 @@ export default function QnaDetail() {
           <div className="card-grid">
             {replies.map((reply) => (
               <div key={reply.id} className="section-compact">
-                <div className="row" style={{ justifyContent: "space-between" }}>
+                <div
+                  className="row"
+                  style={{ justifyContent: "space-between" }}
+                >
                   <div className="row" style={{ gap: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
                       <UserLink user={reply.author} />
                     </span>
                     {reply.author && (
-                      <RoleBadge role={reply.author.role_type} className="text-xs py-0 px-1" />
+                      <RoleBadge
+                        role={reply.author.role_type}
+                        className="text-xs py-0 px-1"
+                      />
                     )}
                     <span className="meta">
                       {new Date(reply.created_at).toLocaleDateString()}
@@ -277,23 +308,35 @@ export default function QnaDetail() {
                   </div>
                   {(user?.id === reply.author_id || isAdmin) && (
                     <div className="row" style={{ gap: 6 }}>
-                      <Link to={`/qna/reply/${reply.id}/edit`} className="btn btn-ghost">
+                      <Link
+                        to={`/qna/reply/${reply.id}/edit`}
+                        className="btn btn-ghost"
+                      >
                         Edit
                       </Link>
                       <replyFetcher.Form
                         method="post"
                         ref={(form) => {
-                          if (form && !editReplyFormsRef.current.includes(form)) {
+                          if (
+                            form &&
+                            !editReplyFormsRef.current.includes(form)
+                          ) {
                             editReplyFormsRef.current.push(form);
                           }
                         }}
                       >
-                        <input type="hidden" name="intent" value="deleteReply" />
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value="deleteReply"
+                        />
                         <input type="hidden" name="replyId" value={reply.id} />
                         <button
                           type="submit"
                           className="btn btn-danger"
-                          onClick={(e) => !confirm("Delete this reply?") && e.preventDefault()}
+                          onClick={(e) =>
+                            !confirm("Delete this reply?") && e.preventDefault()
+                          }
                           disabled={replyFetcher.state === "submitting"}
                         >
                           Delete
@@ -336,7 +379,9 @@ export default function QnaDetail() {
                         style={{ marginTop: 4 }}
                         disabled={replyFetcher.state === "submitting"}
                       >
-                        {replyFetcher.state === "submitting" ? "Saving..." : "Save"}
+                        {replyFetcher.state === "submitting"
+                          ? "Saving..."
+                          : "Save"}
                       </button>
                     </replyFetcher.Form>
                   </details>

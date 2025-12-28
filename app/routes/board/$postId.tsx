@@ -1,4 +1,11 @@
-import { useLoaderData, Form, useRevalidator, Link, redirect, useFetcher } from "react-router";
+import {
+  useLoaderData,
+  Form,
+  useRevalidator,
+  Link,
+  redirect,
+  useFetcher,
+} from "react-router";
 import type { Route } from "./+types/$postId";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -95,7 +102,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Unauthorized to delete this post" };
     }
 
-    const { error } = await supabase.from("board_posts").delete().eq("id", postId);
+    const { error } = await supabase
+      .from("board_posts")
+      .delete()
+      .eq("id", postId);
     if (error) return { error: "Failed to delete post" };
 
     return redirect("/board");
@@ -139,14 +149,20 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     if (intent === "deleteComment") {
-      const { error } = await supabase.from("comments").delete().eq("id", commentId);
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId);
       if (error) return { error: "Failed to delete comment" };
       return { success: true };
     }
 
     const body = formData.get("body") as string;
     if (!body) return { error: "Comment is required" };
-    const { error } = await supabase.from("comments").update({ body }).eq("id", commentId);
+    const { error } = await supabase
+      .from("comments")
+      .update({ body })
+      .eq("id", commentId);
     if (error) return { error: "Failed to update comment" };
     return { success: true };
   }
@@ -158,7 +174,9 @@ export default function BoardPost() {
   const commentFetcher = useFetcher<typeof action>();
   const commentFormRef = useRef<HTMLFormElement>(null);
   const editCommentFormsRef = useRef<HTMLFormElement[]>([]);
-  const prevCommentState = useRef<"idle" | "loading" | "submitting">(commentFetcher.state);
+  const prevCommentState = useRef<"idle" | "loading" | "submitting">(
+    commentFetcher.state
+  );
   const rowsForBody = (body: string) =>
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
   const revalidator = useRevalidator();
@@ -194,7 +212,10 @@ export default function BoardPost() {
               ← Back to Board
             </Link>
           </div>
-          <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", marginBottom: 6 }}
+          >
             <h1 style={{ fontSize: 22, margin: 0 }}>{post.title}</h1>
             {canEdit && (
               <div className="row" style={{ gap: 6 }}>
@@ -207,7 +228,9 @@ export default function BoardPost() {
                     <button
                       type="submit"
                       onClick={(e) =>
-                        !confirm("Are you sure you want to delete this post?") && e.preventDefault()
+                        !confirm(
+                          "Are you sure you want to delete this post?"
+                        ) && e.preventDefault()
                       }
                       className="btn btn-danger"
                     >
@@ -218,15 +241,25 @@ export default function BoardPost() {
               </div>
             )}
           </div>
-          <div className="row" style={{ flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
+          <div
+            className="row"
+            style={{ flexWrap: "wrap", gap: 10, marginBottom: 8 }}
+          >
             <span className="meta">
               Posted by <UserLink user={post.author} />
             </span>
             {post.author && <RoleBadge role={post.author.role_type} />}
-            {post.author?.admin_type === "admin" && <span className="pill">Admin</span>}
-            <span className="meta">{new Date(post.created_at).toLocaleDateString()}</span>
+            {post.author?.admin_type === "admin" && (
+              <span className="pill">Admin</span>
+            )}
+            <span className="meta">
+              {new Date(post.created_at).toLocaleDateString()}
+            </span>
           </div>
-          <div className="section-compact" style={{ background: "var(--surface-2)" }}>
+          <div
+            className="section-compact"
+            style={{ background: "var(--surface-2)" }}
+          >
             <p className="muted" style={{ margin: 0, whiteSpace: "pre-wrap" }}>
               {post.content}
             </p>
@@ -237,7 +270,10 @@ export default function BoardPost() {
           <h2 style={{ fontSize: 18, marginBottom: 10 }}>Comments</h2>
 
           {commentFetcher.data?.error && (
-            <div className="section-compact subtle" style={{ marginBottom: 10 }}>
+            <div
+              className="section-compact subtle"
+              style={{ marginBottom: 10 }}
+            >
               <p className="text-sm" style={{ color: "#f6b8bd" }}>
                 {commentFetcher.data.error}
               </p>
@@ -252,7 +288,6 @@ export default function BoardPost() {
               style={{ marginBottom: 12 }}
               onSubmit={(e) => {
                 prevCommentState.current = "submitting";
-                e.currentTarget.reset();
               }}
             >
               <input type="hidden" name="intent" value="comment" />
@@ -268,7 +303,9 @@ export default function BoardPost() {
                 className="btn btn-accent"
                 disabled={commentFetcher.state === "submitting"}
               >
-                {commentFetcher.state === "submitting" ? "Posting..." : "Post Comment"}
+                {commentFetcher.state === "submitting"
+                  ? "Posting..."
+                  : "Post Comment"}
               </button>
             </commentFetcher.Form>
           ) : (
@@ -279,27 +316,47 @@ export default function BoardPost() {
 
           <div className="card-grid">
             {comments.map((comment) => (
-              <div key={comment.id} className="section-compact" style={{ borderRadius: 6 }}>
-                <div className="row" style={{ gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+              <div
+                key={comment.id}
+                className="section-compact"
+                style={{ borderRadius: 6 }}
+              >
+                <div
+                  className="row"
+                  style={{ gap: 8, marginBottom: 4, flexWrap: "wrap" }}
+                >
                   <span style={{ fontWeight: 600, fontSize: 13 }}>
                     <UserLink user={comment.author} />
                   </span>
                   {comment.author && (
-                    <RoleBadge role={comment.author.role_type} className="text-xs py-0 px-1" />
+                    <RoleBadge
+                      role={comment.author.role_type}
+                      className="text-xs py-0 px-1"
+                    />
                   )}
                   <span className="meta">
                     {new Date(comment.created_at).toLocaleDateString()}
                   </span>
-                  {(user?.id === comment.author_id || profile?.admin_type === "admin") && (
+                  {(user?.id === comment.author_id ||
+                    profile?.admin_type === "admin") && (
                     <div className="row" style={{ gap: 6 }}>
                       <commentFetcher.Form method="post">
-                        <input type="hidden" name="intent" value="deleteComment" />
-                        <input type="hidden" name="commentId" value={comment.id} />
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value="deleteComment"
+                        />
+                        <input
+                          type="hidden"
+                          name="commentId"
+                          value={comment.id}
+                        />
                         <button
                           type="submit"
                           className="btn btn-ghost"
                           onClick={(e) =>
-                            !confirm("Delete this comment?") && e.preventDefault()
+                            !confirm("Delete this comment?") &&
+                            e.preventDefault()
                           }
                           disabled={commentFetcher.state === "submitting"}
                         >
@@ -315,13 +372,24 @@ export default function BoardPost() {
                           className="list"
                           style={{ marginTop: 6 }}
                           ref={(form) => {
-                            if (form && !editCommentFormsRef.current.includes(form)) {
+                            if (
+                              form &&
+                              !editCommentFormsRef.current.includes(form)
+                            ) {
                               editCommentFormsRef.current.push(form);
                             }
                           }}
                         >
-                          <input type="hidden" name="intent" value="editComment" />
-                          <input type="hidden" name="commentId" value={comment.id} />
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="editComment"
+                          />
+                          <input
+                            type="hidden"
+                            name="commentId"
+                            value={comment.id}
+                          />
                           <textarea
                             name="body"
                             defaultValue={comment.body}
@@ -336,14 +404,18 @@ export default function BoardPost() {
                             style={{ marginTop: 4 }}
                             disabled={commentFetcher.state === "submitting"}
                           >
-                            {commentFetcher.state === "submitting" ? "Saving..." : "Save"}
+                            {commentFetcher.state === "submitting"
+                              ? "Saving..."
+                              : "Save"}
                           </button>
                         </commentFetcher.Form>
                       </details>
                     </div>
                   )}
                 </div>
-                <p className="muted" style={{ margin: 0 }}>{comment.body}</p>
+                <p className="muted" style={{ margin: 0 }}>
+                  {comment.body}
+                </p>
               </div>
             ))}
 

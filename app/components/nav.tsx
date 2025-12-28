@@ -8,11 +8,14 @@ interface NavProps {
   profile?: {
     email: string | null;
     role_type: "mentor" | "mentee" | "admin" | "prof";
-    admin_type: "admin" | "user";
+    admin_type?: "admin" | "user" | null;
   };
 }
 
 export function Nav({ user, profile }: NavProps) {
+  const isAdmin =
+    profile?.role_type === "admin" || profile?.admin_type === "admin";
+
   return (
     <nav className="nav">
       <div className="nav-inner">
@@ -23,6 +26,12 @@ export function Nav({ user, profile }: NavProps) {
           <div className="nav-links">
             <Link to="/papers" className="nav-link">
               Papers
+            </Link>
+            <Link to="/issues" className="nav-link">
+              Issues
+            </Link>
+            <Link to="/volumes" className="nav-link">
+              Volumes
             </Link>
             {profile &&
               (profile.role_type === "mentor" ||
@@ -41,6 +50,11 @@ export function Nav({ user, profile }: NavProps) {
             <Link to="/about" className="nav-link">
               About
             </Link>
+            {isAdmin && (
+              <Link to="/admin" className="nav-link">
+                Admin
+              </Link>
+            )}
           </div>
         </div>
 
