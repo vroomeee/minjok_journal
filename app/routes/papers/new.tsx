@@ -1,4 +1,11 @@
-import { Form, redirect, useActionData, Link, useFetcher, useLoaderData } from "react-router";
+import {
+  Form,
+  redirect,
+  useActionData,
+  Link,
+  useFetcher,
+  useLoaderData,
+} from "react-router";
 import type { Route } from "./+types/new";
 import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -40,7 +47,8 @@ export async function action({ request }: Route.ActionArgs) {
     .maybeSingle();
   if (recentArticle) {
     return {
-      error: "You can only upload an article every 5 seconds. Please wait a moment.",
+      error:
+        "You can only upload an article every 5 seconds. Please wait a moment.",
     };
   }
 
@@ -59,8 +67,11 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const filePath = `${user.id}/${article.id}/v1/${file.name}`;
-  const { error: uploadError } = await supabase.storage.from("articles").upload(filePath, file);
-  if (uploadError) return { error: "Failed to upload file: " + uploadError.message };
+  const { error: uploadError } = await supabase.storage
+    .from("articles")
+    .upload(filePath, file);
+  if (uploadError)
+    return { error: "Failed to upload file: " + uploadError.message };
 
   const { data: version, error: versionError } = await supabase
     .from("article_versions")
@@ -75,7 +86,8 @@ export async function action({ request }: Route.ActionArgs) {
     .select()
     .single();
 
-  if (versionError || !version) return { error: "Failed to create version record" };
+  if (versionError || !version)
+    return { error: "Failed to create version record" };
 
   await supabase
     .from("articles")
@@ -103,33 +115,46 @@ export async function action({ request }: Route.ActionArgs) {
 export default function NewPaper() {
   const { user, profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const searchFetcher = useFetcher<{ results: { id: string; full_name: string | null; email: string | null }[] }>();
+  const searchFetcher = useFetcher<{
+    results: { id: string; full_name: string | null; email: string | null }[];
+  }>();
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Record<string, { id: string; full_name: string | null; email: string | null }>>(
-    () =>
-      user
-        ? {
-            [user.id]: {
-              id: user.id,
-              full_name: profile?.full_name || "You",
-              email: profile?.email || user.email || "",
-            },
-          }
-        : {}
+  const [selected, setSelected] = useState<
+    Record<
+      string,
+      { id: string; full_name: string | null; email: string | null }
+    >
+  >(() =>
+    user
+      ? {
+          [user.id]: {
+            id: user.id,
+            full_name: profile?.full_name || "You",
+            email: profile?.email || user.email || "",
+          },
+        }
+      : {}
   );
 
   useEffect(() => {
-    if (query.trim().length === 0) return;
+    if (query.trim().length < 2) return;
     const timeout = setTimeout(() => {
-      searchFetcher.load(`/api/search-profiles?q=${encodeURIComponent(query.trim())}`);
-    }, 250);
+      const params = new URLSearchParams({
+        q: query.trim(),
+      });
+      if (user?.id) params.set("userId", user.id);
+      searchFetcher.load(`/api/search-profiles?${params.toString()}`);
+    }, 500);
     return () => clearTimeout(timeout);
   }, [query, searchFetcher]);
 
   const results = searchFetcher.data?.results || [];
   const selectedList = useMemo(() => Object.values(selected), [selected]);
 
-  const toggleSelect = (profileId: string, entry: { id: string; full_name: string | null; email: string | null }) => {
+  const toggleSelect = (
+    profileId: string,
+    entry: { id: string; full_name: string | null; email: string | null }
+  ) => {
     setSelected((prev) => {
       const next = { ...prev };
       if (next[profileId]) {
@@ -154,7 +179,10 @@ export default function NewPaper() {
       <Nav user={user || undefined} profile={profile || undefined} />
       <div className="page-body" style={{ maxWidth: 720 }}>
         <div className="section">
-          <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", marginBottom: 10 }}
+          >
             <div>
               <h1 style={{ fontSize: 22, margin: 0 }}>Submit New Paper</h1>
               <p className="muted" style={{ margin: 0 }}>
@@ -167,7 +195,10 @@ export default function NewPaper() {
           </div>
 
           {actionData?.error && (
-            <div className="section-compact subtle" style={{ marginBottom: 10 }}>
+            <div
+              className="section-compact subtle"
+              style={{ marginBottom: 10 }}
+            >
               <p className="text-sm" style={{ color: "#f6b8bd" }}>
                 {actionData.error}
               </p>
@@ -187,7 +218,13 @@ export default function NewPaper() {
             </div>
             <div>
               <label className="label">Initial Version (PDF/DOC)</label>
-              <input type="file" name="file" accept=".pdf,.doc,.docx" required className="input" />
+              <input
+                type="file"
+                name="file"
+                accept=".pdf,.doc,.docx"
+                required
+                className="input"
+              />
             </div>
             <div>
               <label className="label">Notes (optional)</label>
@@ -200,13 +237,20 @@ export default function NewPaper() {
             </div>
 
             <div className="section-compact" style={{ gap: 10 }}>
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <div
+                className="row"
+                style={{
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <div>
                   <label className="label" style={{ marginBottom: 4 }}>
                     Authors & Coauthors
                   </label>
                   <p className="muted text-sm" style={{ margin: 0 }}>
-                    You are added automatically. Search to add others before submitting.
+                    You are added automatically. Search to add others before
+                    submitting.
                   </p>
                 </div>
               </div>
@@ -221,12 +265,18 @@ export default function NewPaper() {
                     onChange={(e) => setQuery(e.target.value)}
                     style={{ flex: 1 }}
                   />
-                  <span className="muted text-sm" style={{ alignSelf: "center" }}>
+                  <span
+                    className="muted text-sm"
+                    style={{ alignSelf: "center" }}
+                  >
                     {selectedList.length} selected
                   </span>
                 </div>
                 {query && (
-                  <div className="section-compact" style={{ maxHeight: 220, overflow: "auto" }}>
+                  <div
+                    className="section-compact"
+                    style={{ maxHeight: 220, overflow: "auto" }}
+                  >
                     {results.length === 0 ? (
                       <p className="muted text-sm" style={{ margin: 0 }}>
                         No people found.
@@ -243,8 +293,10 @@ export default function NewPaper() {
                           }}
                         >
                           <div className="column" style={{ gap: 2 }}>
-                            <span style={{ fontWeight: 600 }}>{p.full_name || "Unnamed"}</span>
-                            <span className="muted text-sm">{p.email}</span>
+                            <span style={{ fontWeight: 600 }}>
+                              {p.full_name || "Unnamed"}
+                              {p.email ? ` (${p.email})` : ""}
+                            </span>
                           </div>
                           <input
                             type="checkbox"
@@ -267,11 +319,16 @@ export default function NewPaper() {
                     <div
                       key={p.id}
                       className="row"
-                      style={{ justifyContent: "space-between", alignItems: "center" }}
+                      style={{
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
                     >
                       <div className="column" style={{ gap: 2 }}>
-                        <span style={{ fontWeight: 600 }}>{p.full_name || "Unnamed"}</span>
-                        <span className="muted text-sm">{p.email}</span>
+                        <span style={{ fontWeight: 600 }}>
+                          {p.full_name || "Unnamed"}
+                          {p.email ? ` (${p.email})` : ""}
+                        </span>
                       </div>
                       <input
                         type="checkbox"
@@ -291,7 +348,12 @@ export default function NewPaper() {
               {selectedList
                 .filter((p) => p.id !== user.id)
                 .map((p) => (
-                  <input key={p.id} type="hidden" name="coauthorIds" value={p.id} />
+                  <input
+                    key={p.id}
+                    type="hidden"
+                    name="coauthorIds"
+                    value={p.id}
+                  />
                 ))}
             </div>
 

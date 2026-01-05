@@ -4,6 +4,7 @@ import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { UserLink } from "~/components/user-link";
 import { RoleBadge } from "~/components/role-badge";
+import { useState } from "react";
 import { AuthorList } from "~/components/author-list";
 
 type IssueRecord = {
@@ -17,6 +18,9 @@ type IssueRecord = {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
+  const url = new URL(request.url);
+  const availablePage = parseInt(url.searchParams.get("availablePage") || "1", 10);
+  const availablePerPage = 50;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -33,7 +37,33 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const isAdmin = profile?.role_type === "admin";
 
-  const { data: publishedPapers = [] } = await supabase
+  const { data: attachedArticleRows = [] } = await supabase
+    .from("issue_articles")
+    .select("article_id");
+
+  const attachedArticleIds = new Set(
+    attachedArticleRows.map((row) => row.article_id).filter(Boolean)
+  );
+
+  const excludedList =
+    attachedArticleIds.size > 0
+      ? Array.from(attachedArticleIds)
+          .map((id) => `"${id}"`)
+          .join(",")
+      : null;
+
+  let countQuery = supabase
+    .from("articles")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "published");
+
+  if (excludedList) {
+    countQuery = countQuery.not("id", "in", `(${excludedList})`);
+  }
+
+  const { count: availableCount } = await countQuery;
+
+  let dataQuery = supabase
     .from("articles")
     .select(
       `
@@ -48,11 +78,24 @@ export async function loader({ request }: Route.LoaderArgs) {
             full_name,
             role_type
           )
+        ),
+        issue_articles:issue_articles!left(article_id)(
+          issue_id
         )
       `
     )
-    .eq("status", "published")
-    .order("created_at", { ascending: false });
+    .eq("status", "published");
+
+  if (excludedList) {
+    dataQuery = dataQuery.not("id", "in", `(${excludedList})`);
+  }
+
+  const { data: availablePapers = [] } = await dataQuery
+    .order("created_at", { ascending: false })
+    .range(
+      (availablePage - 1) * availablePerPage,
+      availablePage * availablePerPage - 1
+    );
 
   const {
     data: issues = [],
@@ -118,8 +161,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     user,
     profile,
     isAdmin,
-    publishedPapers,
+    publishedPapers: availablePapers,
     issues: issuesWithArticles,
+    availablePage,
+    availableTotalPages: Math.max(
+      1,
+      Math.ceil((availableCount || 0) / availablePerPage)
+    ),
     schemaMissing,
   };
 }
@@ -129,6 +177,7 @@ export async function action({ request }: Route.ActionArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
+  const issueId = formData.get("issueId") as string | null;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -142,12 +191,20 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "Only admins can manage issues." };
   }
 
+  if (intent === "delete-issue") {
+    if (!issueId) return { error: "Missing issue" };
+    const { error } = await supabase.from("issues").delete().eq("id", issueId);
+    if (error) return { error: "Failed to delete issue" };
+    return { success: true };
+  }
+
   if (intent === "create-issue") {
     const title = ((formData.get("title") as string) || "").trim();
     const description =
       ((formData.get("description") as string) || "").trim() || null;
     const status =
       formData.get("status") === "draft" ? ("draft" as const) : ("released" as const);
+    const coverFile = formData.get("cover") as File | null;
     const articleIds = formData
       .getAll("paperIds")
       .map((id) => (id ? String(id) : ""))
@@ -156,6 +213,9 @@ export async function action({ request }: Route.ActionArgs) {
     if (!title) return { error: "Title is required." };
     if (!articleIds.length) {
       return { error: "Select at least one published paper." };
+    }
+    if (!coverFile || typeof coverFile === "string" || coverFile.size === 0) {
+      return { error: "Cover image is required." };
     }
 
     const release_date = status === "released" ? new Date().toISOString() : null;
@@ -184,6 +244,20 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "Issue created, but failed to attach papers." };
     }
 
+    if (coverFile && coverFile.size > 0) {
+      const path = `${user.id}/issues/${issue.id}/${Date.now()}-${coverFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("covers")
+        .upload(path, coverFile, { contentType: coverFile.type || undefined });
+      if (uploadError) {
+        return { error: "Issue created, but failed to upload cover." };
+      }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("covers").getPublicUrl(path);
+      await supabase.from("issues").update({ cover_url: publicUrl }).eq("id", issue.id);
+    }
+
     return { success: true };
   }
 
@@ -191,9 +265,18 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function IssuesPage() {
-  const { user, profile, isAdmin, publishedPapers, issues, schemaMissing } =
-    useLoaderData<typeof loader>();
+  const {
+    user,
+    profile,
+    isAdmin,
+    publishedPapers,
+    issues,
+    availablePage,
+    availableTotalPages,
+    schemaMissing,
+  } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const [coverName, setCoverName] = useState<string | null>(null);
 
   return (
     <div className="page">
@@ -249,7 +332,7 @@ export default function IssuesPage() {
               </div>
             )}
 
-            <Form method="post" className="list" style={{ gap: 12 }}>
+            <Form method="post" encType="multipart/form-data" className="list" style={{ gap: 12 }}>
               <input type="hidden" name="intent" value="create-issue" />
               <div className="row" style={{ gap: 12 }}>
                 <div style={{ flex: 2 }}>
@@ -278,6 +361,21 @@ export default function IssuesPage() {
                   rows={3}
                   placeholder="Short blurb for this issue"
                 />
+              </div>
+
+              <div>
+                <label className="label">Cover image (required)</label>
+                <input
+                  type="file"
+                  name="cover"
+                  accept="image/*"
+                  className="input"
+                  required
+                  onChange={(e) => setCoverName(e.target.files?.[0]?.name || null)}
+                />
+                {coverName && (
+                  <span className="muted text-sm">Selected: {coverName}</span>
+                )}
               </div>
 
               <div>
@@ -339,6 +437,35 @@ export default function IssuesPage() {
                     ))}
                   </div>
                 )}
+                {availableTotalPages > 1 && (
+                  <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                    <Link
+                      to={`/issues?availablePage=${Math.max(1, availablePage - 1)}`}
+                      className="btn btn-ghost"
+                      aria-disabled={availablePage <= 1}
+                      style={{
+                        pointerEvents: availablePage <= 1 ? "none" : "auto",
+                        opacity: availablePage <= 1 ? 0.5 : 1,
+                      }}
+                    >
+                      Prev
+                    </Link>
+                    <span className="muted text-sm">
+                      Page {availablePage} of {availableTotalPages}
+                    </span>
+                    <Link
+                      to={`/issues?availablePage=${Math.min(availableTotalPages, availablePage + 1)}`}
+                      className="btn btn-ghost"
+                      aria-disabled={availablePage >= availableTotalPages}
+                      style={{
+                        pointerEvents: availablePage >= availableTotalPages ? "none" : "auto",
+                        opacity: availablePage >= availableTotalPages ? 0.5 : 1,
+                      }}
+                    >
+                      Next
+                    </Link>
+                  </div>
+                )}
               </div>
 
               <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
@@ -364,10 +491,17 @@ export default function IssuesPage() {
             </p>
           ) : (
             <div className="column" style={{ gap: 10 }}>
-              {issues.map((issue) => (
-                <div key={issue.id} className="section-compact" style={{ gap: 6 }}>
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
+            {issues.map((issue) => (
+              <div key={issue.id} className="section-compact" style={{ gap: 6 }}>
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                    {issue.cover_url && (
+                        <img
+                          src={issue.cover_url}
+                          alt={`${issue.title} cover`}
+                          style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }}
+                        />
+                      )}
                       <h3 style={{ margin: 0 }}>{issue.title}</h3>
                       <span
                         className="pill"
@@ -379,11 +513,29 @@ export default function IssuesPage() {
                         {issue.status}
                       </span>
                     </div>
-                    <span className="muted text-sm">
-                      {issue.release_date
-                        ? new Date(issue.release_date).toLocaleDateString()
-                        : new Date(issue.created_at).toLocaleDateString()}
-                    </span>
+                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                      <span className="muted text-sm">
+                        {issue.release_date
+                          ? new Date(issue.release_date).toLocaleDateString()
+                          : new Date(issue.created_at).toLocaleDateString()}
+                      </span>
+                      {isAdmin && (
+                        <Form
+                          method="post"
+                          onSubmit={(e) => {
+                            if (!confirm("Delete this issue? Papers will simply become available again.")) {
+                              e.preventDefault();
+                            }
+                          }}
+                        >
+                          <input type="hidden" name="intent" value="delete-issue" />
+                          <input type="hidden" name="issueId" value={issue.id} />
+                          <button type="submit" className="btn btn-ghost" style={{ color: "#f6b8bd" }}>
+                            Delete
+                          </button>
+                        </Form>
+                      )}
+                    </div>
                   </div>
                   {issue.description && (
                     <p className="muted text-sm" style={{ margin: 0 }}>

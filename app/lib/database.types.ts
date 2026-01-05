@@ -254,6 +254,7 @@ export interface Database {
           description: string | null
           status: "draft" | "released"
           release_date: string | null
+          cover_url: string | null
         }
         Insert: {
           id?: string
@@ -263,6 +264,7 @@ export interface Database {
           description?: string | null
           status?: "draft" | "released"
           release_date?: string | null
+          cover_url?: string | null
         }
         Update: {
           id?: string
@@ -272,6 +274,7 @@ export interface Database {
           description?: string | null
           status?: "draft" | "released"
           release_date?: string | null
+          cover_url?: string | null
         }
       }
       issue_articles: {
@@ -306,6 +309,7 @@ export interface Database {
           description: string | null
           status: "draft" | "released"
           release_date: string | null
+          cover_url: string | null
         }
         Insert: {
           id?: string
@@ -315,6 +319,7 @@ export interface Database {
           description?: string | null
           status?: "draft" | "released"
           release_date?: string | null
+          cover_url?: string | null
         }
         Update: {
           id?: string
@@ -324,6 +329,7 @@ export interface Database {
           description?: string | null
           status?: "draft" | "released"
           release_date?: string | null
+          cover_url?: string | null
         }
       }
       volume_issues: {

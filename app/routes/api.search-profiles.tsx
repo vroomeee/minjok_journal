@@ -1,26 +1,37 @@
 import type { Route } from "./+types/api.search-profiles";
-import { json } from "react-router";
-import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
   const url = new URL(request.url);
   const q = (url.searchParams.get("q") || "").trim();
-  if (!q) return json({ results: [] });
+  const excludeId = url.searchParams.get("userId") || null;
+  if (q.length < 2) {
+    return new Response(JSON.stringify({ results: [] }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, email, role_type")
     .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`)
-    .neq("id", user.id)
+    .neq("id", excludeId || "")
     .limit(10);
 
   if (error) {
-    return json({ results: [], error: "Search failed" }, { status: 500 });
+    return new Response(
+      JSON.stringify({ results: [], error: "Search failed" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
-  return json({ results: data || [] });
+  return new Response(JSON.stringify({ results: data || [] }), {
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 export default function ApiSearchProfiles() {
