@@ -6,7 +6,7 @@ import {
   useLoaderData,
   Link,
 } from "react-router";
-import type { Route } from "./+types/$replyId.edit";
+import type { Route } from "./+types/$questionId.edit";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 
@@ -57,7 +57,7 @@ const buttonGhost: React.CSSProperties = {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
-  const { replyId } = params;
+  const { questionId } = params;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -67,27 +67,27 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const isAdmin = profile?.role_type === "admin";
 
-  const { data: reply, error } = await supabase
-    .from("qna_replies")
+  const { data: question, error } = await supabase
+    .from("qna_questions")
     .select("*")
-    .eq("id", replyId)
+    .eq("id", questionId)
     .single();
 
-  if (error || !reply) {
-    throw new Response("Reply not found", { status: 404 });
+  if (error || !question) {
+    throw new Response("Question not found", { status: 404 });
   }
 
-  if (reply.author_id !== user.id && !isAdmin) {
+  if (question.author_id !== user.id && !isAdmin) {
     throw new Response("Unauthorized", { status: 403 });
   }
 
-  return { reply, user, profile };
+  return { question, user, profile };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
-  const { replyId } = params;
+  const { questionId } = params;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -97,37 +97,38 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const isAdmin = profile?.role_type === "admin";
 
-  const { data: reply } = await supabase
-    .from("qna_replies")
+  const { data: question } = await supabase
+    .from("qna_questions")
     .select("author_id")
-    .eq("id", replyId)
+    .eq("id", questionId)
     .single();
 
-  if (!reply || (reply.author_id !== user.id && !isAdmin)) {
+  if (!question || (question.author_id !== user.id && !isAdmin)) {
     return { error: "Unauthorized" };
   }
 
   const formData = await request.formData();
+  const title = formData.get("title") as string;
   const content = formData.get("content") as string;
 
-  if (!content) {
-    return { error: "Content is required" };
+  if (!title || !content) {
+    return { error: "Title and content are required" };
   }
 
   const { error } = await supabase
-    .from("qna_replies")
-    .update({ content })
-    .eq("id", replyId);
+    .from("qna_questions")
+    .update({ title, content })
+    .eq("id", questionId);
 
   if (error) {
-    return { error: "Failed to update reply" };
+    return { error: "Failed to update question" };
   }
 
   return redirect("/qna");
 }
 
-export default function EditQnaReply() {
-  const { reply, user, profile } = useLoaderData<typeof loader>();
+export default function EditQnaQuestion() {
+  const { question, user, profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
@@ -139,11 +140,11 @@ export default function EditQnaReply() {
           <Link to="/qna" className="btn btn-ghost">
             ← Back to Q&A
           </Link>
-          <span className="muted text-sm">Edit reply</span>
+          <span className="muted text-sm">Edit question</span>
         </div>
 
         <div style={{ ...panelStyle, padding: 24 }}>
-          <h1 style={{ margin: "0 0 12px", fontSize: 20 }}>Edit reply</h1>
+          <h1 style={{ margin: "0 0 12px", fontSize: 20 }}>Edit question</h1>
 
           {actionData?.error && (
             <div
@@ -162,6 +163,20 @@ export default function EditQnaReply() {
 
           <Form method="post" className="column" style={{ gap: 14 }}>
             <div>
+              <label htmlFor="title" style={labelStyle}>
+                Title
+              </label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                defaultValue={question.title}
+                required
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
               <label htmlFor="content" style={labelStyle}>
                 Content
               </label>
@@ -169,7 +184,7 @@ export default function EditQnaReply() {
                 id="content"
                 name="content"
                 rows={8}
-                defaultValue={reply.content}
+                defaultValue={question.content}
                 required
                 style={{ ...inputStyle, minHeight: 180, resize: "vertical" }}
               />

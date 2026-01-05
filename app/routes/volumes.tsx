@@ -191,7 +191,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (!volumeId) return { error: "Missing volume" };
     const { error } = await supabase.from("volumes").delete().eq("id", volumeId);
     if (error) return { error: "Failed to delete volume." };
-    return { success: true };
+    return { success: "deleted" as const };
   }
 
   if (intent === "create-volume") {
@@ -252,7 +252,7 @@ export async function action({ request }: Route.ActionArgs) {
     } = supabase.storage.from("covers").getPublicUrl(path);
     await supabase.from("volumes").update({ cover_url: publicUrl }).eq("id", volume.id);
 
-    return { success: true };
+    return { success: "created" as const };
   }
 
   return { error: "Unknown action." };
@@ -318,13 +318,13 @@ export default function VolumesPage() {
                 </p>
               </div>
             )}
-            {actionData?.success && (
-              <div className="section-compact subtle" style={{ marginBottom: 10 }}>
-                <p className="text-sm" style={{ color: "var(--accent)", margin: 0 }}>
-                  Volume created.
-                </p>
-              </div>
-            )}
+        {actionData?.success && (
+          <div className="section-compact subtle" style={{ marginBottom: 10 }}>
+            <p className="text-sm" style={{ color: "var(--accent)", margin: 0 }}>
+              {actionData.success === "deleted" ? "Volume deleted." : "Volume created."}
+            </p>
+          </div>
+        )}
 
             <Form method="post" encType="multipart/form-data" className="list" style={{ gap: 12 }}>
               <input type="hidden" name="intent" value="create-volume" />

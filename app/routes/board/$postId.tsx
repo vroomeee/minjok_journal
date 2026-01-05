@@ -10,7 +10,7 @@ import type { Route } from "./+types/$postId";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UserLink } from "~/components/user-link";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -176,6 +176,7 @@ export default function BoardPost() {
   const prevCommentState = useRef<"idle" | "loading" | "submitting">(
     commentFetcher.state
   );
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const rowsForBody = (body: string) =>
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
   const revalidator = useRevalidator();
@@ -195,6 +196,7 @@ export default function BoardPost() {
     ) {
       commentFormRef.current?.reset();
       editCommentFormsRef.current.forEach((form) => form?.reset());
+      setEditingCommentId(null);
       revalidator.revalidate();
     }
     prevCommentState.current = commentFetcher.state;
@@ -362,59 +364,69 @@ export default function BoardPost() {
                           Delete
                         </button>
                       </commentFetcher.Form>
-                      <details>
-                        <summary className="nav-link" style={{ padding: 0 }}>
-                          Edit
-                        </summary>
-                        <commentFetcher.Form
-                          method="post"
-                          className="list"
-                          style={{ marginTop: 6 }}
-                          ref={(form) => {
-                            if (
-                              form &&
-                              !editCommentFormsRef.current.includes(form)
-                            ) {
-                              editCommentFormsRef.current.push(form);
-                            }
-                          }}
-                        >
-                          <input
-                            type="hidden"
-                            name="intent"
-                            value="editComment"
-                          />
-                          <input
-                            type="hidden"
-                            name="commentId"
-                            value={comment.id}
-                          />
-                          <textarea
-                            name="body"
-                            defaultValue={comment.body}
-                            rows={rowsForBody(comment.body)}
-                            required
-                            className="textarea"
-                            style={{ width: "100%" }}
-                          />
-                          <button
-                            type="submit"
-                            className="btn btn-accent"
-                            style={{ marginTop: 4 }}
-                            disabled={commentFetcher.state === "submitting"}
-                          >
-                            {commentFetcher.state === "submitting"
-                              ? "Saving..."
-                              : "Save"}
-                          </button>
-                        </commentFetcher.Form>
-                      </details>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() =>
+                          setEditingCommentId(
+                            editingCommentId === comment.id ? null : comment.id
+                          )
+                        }
+                      >
+                        {editingCommentId === comment.id ? "Cancel" : "Edit"}
+                      </button>
                     </div>
                   )}
                 </div>
-                <p className="muted" style={{ margin: 0 }}>
-                  {comment.body}
-                </p>
+                {editingCommentId === comment.id ? (
+                  <commentFetcher.Form
+                    method="post"
+                    className="list"
+                    style={{ marginTop: 6 }}
+                    ref={(form) => {
+                      if (form && !editCommentFormsRef.current.includes(form)) {
+                        editCommentFormsRef.current.push(form);
+                      }
+                    }}
+                    onSubmit={() => {
+                      prevCommentState.current = "submitting";
+                      setEditingCommentId(null);
+                    }}
+                  >
+                    <input type="hidden" name="intent" value="editComment" />
+                    <input type="hidden" name="commentId" value={comment.id} />
+                    <textarea
+                      name="body"
+                      defaultValue={comment.body}
+                      rows={rowsForBody(comment.body)}
+                      required
+                      className="textarea"
+                      style={{ width: "100%" }}
+                    />
+                    <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setEditingCommentId(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-accent"
+                        disabled={commentFetcher.state === "submitting"}
+                      >
+                        {commentFetcher.state === "submitting"
+                          ? "Saving..."
+                          : "Save"}
+                      </button>
+                    </div>
+                  </commentFetcher.Form>
+                ) : (
+                  <p className="muted" style={{ margin: 0 }}>
+                    {comment.body}
+                  </p>
+                )}
               </div>
             ))}
 
