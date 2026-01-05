@@ -100,6 +100,16 @@ type Pages = {
       "questionId": string;
     };
   };
+  "/qna/:questionId/edit": {
+    params: {
+      "questionId": string;
+    };
+  };
+  "/qna/reply/:replyId/edit": {
+    params: {
+      "replyId": string;
+    };
+  };
   "/board": {
     params: {};
   };
@@ -133,7 +143,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit" | "/api/search-profiles" | "/issues" | "/volumes" | "/admin";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/qna/:questionId/edit" | "/qna/reply/:replyId/edit" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit" | "/api/search-profiles" | "/issues" | "/volumes" | "/admin";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -231,6 +241,14 @@ type RouteFiles = {
     id: "routes/qna/$questionId";
     page: "/qna/:questionId";
   };
+  "routes/qna/$questionId.edit.tsx": {
+    id: "routes/qna/$questionId.edit";
+    page: "/qna/:questionId/edit";
+  };
+  "routes/qna/reply/$replyId.edit.tsx": {
+    id: "routes/qna/reply/$replyId.edit";
+    page: "/qna/reply/:replyId/edit";
+  };
   "routes/board.tsx": {
     id: "routes/board";
     page: "/board";
@@ -291,6 +309,8 @@ type RouteModules = {
   "routes/qna": typeof import("./app/routes/qna.tsx");
   "routes/qna/new": typeof import("./app/routes/qna/new.tsx");
   "routes/qna/$questionId": typeof import("./app/routes/qna/$questionId.tsx");
+  "routes/qna/$questionId.edit": typeof import("./app/routes/qna/$questionId.edit.tsx");
+  "routes/qna/reply/$replyId.edit": typeof import("./app/routes/qna/reply/$replyId.edit.tsx");
   "routes/board": typeof import("./app/routes/board.tsx");
   "routes/board/new": typeof import("./app/routes/board/new.tsx");
   "routes/board/$postId": typeof import("./app/routes/board/$postId.tsx");

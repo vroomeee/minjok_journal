@@ -44,6 +44,8 @@ export default [
   route("qna", "routes/qna.tsx"),
   route("qna/new", "routes/qna/new.tsx"),
   route("qna/:questionId", "routes/qna/$questionId.tsx"),
+  route("qna/:questionId/edit", "routes/qna/$questionId.edit.tsx"),
+  route("qna/reply/:replyId/edit", "routes/qna/reply/$replyId.edit.tsx"),
   route("board", "routes/board.tsx"),
   route("board/new", "routes/board/new.tsx"),
   route("board/:postId", "routes/board/$postId.tsx"),
