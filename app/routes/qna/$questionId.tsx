@@ -6,6 +6,7 @@ import {
   useLoaderData,
   useFetcher,
   useRevalidator,
+  useRouteLoaderData,
 } from "react-router";
 import type { Route } from "./+types/$questionId";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
@@ -17,20 +18,6 @@ import { useEffect, useRef } from "react";
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { questionId } = params;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
 
   const { data: question, error } = await supabase
     .from("qna_questions")
@@ -68,7 +55,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("question_id", questionId)
     .order("created_at", { ascending: true });
 
-  return { user, profile, question, replies: replies || [] };
+  return { question, replies: replies || [] };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -164,7 +151,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function QnaDetail() {
-  const { user, profile, question, replies } = useLoaderData<typeof loader>();
+  const { question, replies } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string }; profile?: { role_type?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
   const actionData = useActionData<typeof action>();
   const replyFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();

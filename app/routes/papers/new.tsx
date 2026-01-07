@@ -66,6 +66,23 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "Failed to create article" };
   }
 
+  // Insert author relationships (submitter + coauthors) before creating versions
+  const uniqueAuthorIds = Array.from(new Set([user.id, ...coauthorIds]));
+  const authorRows = uniqueAuthorIds.map((profile_id, idx) => ({
+    article_id: article.id,
+    profile_id,
+    position: idx,
+    is_corresponding: profile_id === user.id,
+  }));
+  if (authorRows.length) {
+    const { error: authorsError } = await supabase
+      .from("article_authors")
+      .insert(authorRows);
+    if (authorsError) {
+      return { error: "Failed to add authors: " + authorsError.message };
+    }
+  }
+
   const filePath = `${user.id}/${article.id}/v1/${file.name}`;
   const { error: uploadError } = await supabase.storage
     .from("articles")
@@ -87,7 +104,9 @@ export async function action({ request }: Route.ActionArgs) {
     .single();
 
   if (versionError || !version)
-    return { error: "Failed to create version record" };
+    return {
+      error: `Failed to create version record: ${versionError?.message || "unknown error"}`,
+    };
 
   await supabase
     .from("articles")
@@ -96,18 +115,6 @@ export async function action({ request }: Route.ActionArgs) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", article.id);
-
-  // Insert author relationships (submitter + coauthors)
-  const uniqueAuthorIds = Array.from(new Set([user.id, ...coauthorIds]));
-  const authorRows = uniqueAuthorIds.map((profile_id, idx) => ({
-    article_id: article.id,
-    profile_id,
-    position: idx,
-    is_corresponding: profile_id === user.id,
-  }));
-  if (authorRows.length) {
-    await supabase.from("article_authors").insert(authorRows);
-  }
 
   return redirect(`/papers/${article.id}`);
 }

@@ -1,4 +1,4 @@
-import { Link, useLoaderData, Form } from "react-router";
+import { Link, useLoaderData, Form, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/qna";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -10,20 +10,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const url = new URL(request.url);
   const search = url.searchParams.get("search") || "";
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
 
   let query = supabase
     .from("qna_questions")
@@ -46,7 +32,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: questions } = await query;
 
-  return { questions: questions || [], user, profile, search };
+  return { questions: questions || [], search };
 }
 
 // No list-level mutations; keep action for compatibility
@@ -103,7 +89,12 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function QnA() {
-  const { questions, user, profile, search } = useLoaderData<typeof loader>();
+  const { questions, search } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string }; profile?: { role_type?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
 
   const truncateTitle = (title: string) =>
     title.length > 20 ? `${title.slice(0, 20)}...` : title;

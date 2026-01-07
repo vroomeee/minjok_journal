@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router";
+import { useLoaderData, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/$userId";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -8,20 +8,6 @@ import { Link } from "react-router";
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { userId } = params;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let currentUserProfile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    currentUserProfile = data;
-  }
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -37,11 +23,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
-  return { user, currentUserProfile, profile, papers: papers || [] };
+  return { profile, papers: papers || [] };
 }
 
 export default function ProfilePage() {
-  const { user, currentUserProfile, profile, papers } = useLoaderData<typeof loader>();
+  const { profile, papers } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string }; profile?: { role_type?: string | null; email?: string | null; full_name?: string | null; intro?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const currentUserProfile = rootData?.profile;
   const isOwnProfile = user?.id === profile.id;
 
   return (

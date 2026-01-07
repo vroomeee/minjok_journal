@@ -6,6 +6,7 @@ import {
   useActionData,
   useFetcher,
   useRevalidator,
+  useRouteLoaderData,
 } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/$paperId";
@@ -22,21 +23,6 @@ import { AuthorList } from "~/components/author-list";
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { paperId } = params;
-
-  // Get current user (optional)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
 
   // Fetch paper with author and versions
   const { data: paper, error } = await supabase
@@ -122,8 +108,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   return {
     paper,
-    user,
-    profile,
     comments,
     activeVersionId,
     publishedVersion,
@@ -344,13 +328,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function PaperDetail() {
   const {
     paper,
-    user,
-    profile,
     comments,
     activeVersionId,
     publishedVersion,
     publishedFileUrl,
   } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string }; profile?: { role_type?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
   const actionData = useActionData<typeof action>();
   const commentFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();

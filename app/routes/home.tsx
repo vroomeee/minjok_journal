@@ -1,40 +1,13 @@
-import { Link, useLoaderData } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 
-// Server-side loader to get user info
-export async function loader({ request }: Route.LoaderArgs) {
-  const { supabase } = createSupabaseServerClient(request);
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  // When there's no session, Supabase returns AuthSessionMissingError. Treat as guest.
-  if (error) {
-    if (error.name === "AuthSessionMissingError" || error.status === 400) {
-      return { user: null, profile: null };
-    }
-    throw error;
-  }
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
-
-  return { user, profile };
-}
-
 export default function Home() {
-  const { user, profile } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string; email?: string }; profile?: { role_type?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
 
   return (
     <div className="page">

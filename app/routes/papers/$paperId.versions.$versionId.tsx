@@ -5,6 +5,7 @@ import {
   useActionData,
   useFetcher,
   useRevalidator,
+  useRouteLoaderData,
 } from "react-router";
 import type { Route } from "./+types/$paperId.versions.$versionId";
 import {
@@ -21,20 +22,6 @@ import { UserLink } from "~/components/user-link";
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { paperId, versionId } = params;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
 
   const { data: paper } = await supabase
     .from("articles")
@@ -120,8 +107,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     fileUrl,
     comments: comments || [],
     replies,
-    user,
-    profile,
     totalVersions: versionList?.length || 0,
   };
 }
@@ -321,10 +306,13 @@ export default function VersionReview() {
     fileUrl,
     comments,
     replies,
-    user,
-    profile,
     totalVersions,
   } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string }; profile?: { role_type?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
   const actionData = useActionData<typeof action>();
   const commentFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();

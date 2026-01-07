@@ -5,6 +5,7 @@ import {
   Link,
   redirect,
   useFetcher,
+  useRouteLoaderData,
 } from "react-router";
 import type { Route } from "./+types/$postId";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
@@ -16,20 +17,6 @@ import { UserLink } from "~/components/user-link";
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { postId } = params;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
 
   const { data: post, error } = await supabase
     .from("board_posts")
@@ -69,8 +56,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return {
     post,
     comments: comments || [],
-    user,
-    profile,
   };
 }
 
@@ -181,7 +166,13 @@ export default function BoardPost() {
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
   const revalidator = useRevalidator();
 
-  const { post, comments, user, profile } = useLoaderData<typeof loader>();
+  const { post, comments } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as {
+    user?: { id: string };
+    profile?: { role_type?: string | null };
+  } | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
 
   const isAdmin = profile?.role_type === "admin";
   const isAuthor = user?.id === post.author?.id;

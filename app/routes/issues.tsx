@@ -1,4 +1,4 @@
-import { Form, Link, useActionData, useLoaderData } from "react-router";
+import { Form, Link, useActionData, useLoaderData, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/issues";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -21,21 +21,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const availablePage = parseInt(url.searchParams.get("availablePage") || "1", 10);
   const availablePerPage = 50;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, email, role_type")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
-
-  const isAdmin = profile?.role_type === "admin";
 
   const { data: attachedArticleRows = [] } = await supabase
     .from("issue_articles")
@@ -158,9 +143,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const schemaMissing = Boolean(issuesError);
 
   return {
-    user,
-    profile,
-    isAdmin,
     publishedPapers: availablePapers,
     issues: issuesWithArticles,
     availablePage,
@@ -266,15 +248,18 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function IssuesPage() {
   const {
-    user,
-    profile,
-    isAdmin,
     publishedPapers,
     issues,
     availablePage,
     availableTotalPages,
     schemaMissing,
   } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string }; profile?: { role_type?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
+  const isAdmin = profile?.role_type === "admin";
   const actionData = useActionData<typeof action>();
   const [coverName, setCoverName] = useState<string | null>(null);
 

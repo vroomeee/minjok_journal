@@ -5,9 +5,10 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
-} from "react-router";
+} from "react-router";  
 import type { Route } from "./+types/root";
 import stylesheet from "./app.css?url";
+import { getUserAndProfile } from "./lib/supabase.server";
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.ico?v=3", type: "image/x-icon" },
@@ -24,13 +25,16 @@ export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
 ];
 
-// Loader to pass environment variables to client
-export async function loader() {
+// Loader to pass environment variables and user to client
+export async function loader({ request }: Route.LoaderArgs) {
+  const { user, profile } = await getUserAndProfile(request);
   return {
     ENV: {
       SUPABASE_URL: process.env.SUPABASE_URL!,
       SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
     },
+    user,
+    profile,
   };
 }
 

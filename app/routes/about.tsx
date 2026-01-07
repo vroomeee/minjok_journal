@@ -1,30 +1,14 @@
-import { useLoaderData, Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/about";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const { supabase } = createSupabaseServerClient(request);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
-
-  return { user, profile };
-}
-
 export default function About() {
-  const { user, profile } = useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string; email?: string }; profile?: { role_type?: string | null; email?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
 
   return (
     <div className="page">

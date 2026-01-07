@@ -1,6 +1,6 @@
 import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/review";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { createSupabaseServerClient, getUserAndProfile } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { AuthorList } from "~/components/author-list";
@@ -8,19 +8,7 @@ import { AuthorList } from "~/components/author-list";
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
+  const { user, profile } = await getUserAndProfile(request);
 
   // Redirect if user is not logged in or is not a mentor or prof
   if (

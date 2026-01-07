@@ -1,4 +1,4 @@
-import { Link, useLoaderData, Form } from "react-router";
+import { Link, useLoaderData, Form, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/papers";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -13,26 +13,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const page = parseInt(url.searchParams.get("page") || "1");
   const search = url.searchParams.get("search") || "";
   const perPage = 6;
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  // Missing session can return AuthSessionMissingError; treat as guest.
-  if (authError && authError.name !== "AuthSessionMissingError" && authError.status !== 400) {
-    throw authError;
-  }
-
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
 
   let query = supabase
     .from("articles")
@@ -75,8 +55,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     papers: papers || [],
-    user,
-    profile,
     currentPage: page,
     totalPages,
     search,
@@ -84,8 +62,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Papers() {
-  const { papers, user, profile, currentPage, totalPages, search } =
+  const { papers, currentPage, totalPages, search } =
     useLoaderData<typeof loader>();
+  const rootData = useRouteLoaderData("root") as
+    | { user?: { id: string }; profile?: { role_type?: string | null } }
+    | null;
+  const user = rootData?.user;
+  const profile = rootData?.profile;
   const perPage = 6;
 
   const getPageNumbers = () => {

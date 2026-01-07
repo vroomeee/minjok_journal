@@ -1,4 +1,4 @@
-import { Link, Form } from "react-router";
+import { Link, Form, useRouteLoaderData } from "react-router";
 
 interface NavProps {
   user?: {
@@ -12,7 +12,16 @@ interface NavProps {
 }
 
 export function Nav({ user, profile }: NavProps) {
-  const isAdmin = profile?.role_type === "admin";
+  const rootData = useRouteLoaderData("root") as
+    | {
+        user?: { id: string; email?: string };
+        profile?: { email: string | null; role_type: any };
+      }
+    | undefined;
+  const resolvedUser = user ?? rootData?.user;
+  const resolvedProfile = profile ?? rootData?.profile;
+
+  const isAdmin = resolvedProfile?.role_type === "admin";
 
   return (
     <nav className="nav">
@@ -57,13 +66,15 @@ export function Nav({ user, profile }: NavProps) {
         </div>
 
         <div className="nav-links" style={{ gap: 10 }}>
-          {user && profile ? (
+          {resolvedUser && resolvedProfile ? (
             <>
               <Link to="/my-papers" className="nav-link">
                 My Papers
               </Link>
-              <Link to={`/profile/${user.id}`} className="nav-link">
-                <span className="pill">{profile.email || user.email}</span>
+              <Link to={`/profile/${resolvedUser.id}`} className="nav-link">
+                <span className="pill">
+                  {resolvedProfile.email || resolvedUser.email}
+                </span>
               </Link>
               <Form method="post" action="/auth/logout">
                 <button
