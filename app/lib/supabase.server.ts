@@ -72,6 +72,17 @@ export async function getUserAndProfile(request: Request) {
   }
 
   const userProfilePromise = (async () => {
+    // Skip auth check if no Supabase auth cookies exist (avoids unnecessary refresh attempts)
+    const cookies = parseCookieHeader(request.headers.get("Cookie") ?? "");
+    const hasAuthCookies = cookies.some(c =>
+      c.name.includes('auth-token') ||
+      c.name.includes('sb-') // Supabase cookie prefix
+    );
+
+    if (!hasAuthCookies) {
+      return { user: null, profile: null };
+    }
+
     const {
       data: { user },
       error,
@@ -80,7 +91,13 @@ export async function getUserAndProfile(request: Request) {
     if (error) {
       if (error.name === "AuthSessionMissingError" || error.status === 400) {
         // Clear invalid auth cookies to prevent repeated refresh token errors
-        await supabase.auth.signOut({ scope: 'local' });
+        try {
+          await supabase.auth.signOut({ scope: 'local' });
+        } catch {
+          // Ignore signOut errors - cookies may already be invalid
+        }
+        // Remove from cache so subsequent requests also clear cookies
+        userProfileCache.delete(cookieKey);
         return { user: null, profile: null };
       }
       throw error;
