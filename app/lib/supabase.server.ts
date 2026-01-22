@@ -79,6 +79,8 @@ export async function getUserAndProfile(request: Request) {
 
     if (error) {
       if (error.name === "AuthSessionMissingError" || error.status === 400) {
+        // Clear invalid auth cookies to prevent repeated refresh token errors
+        await supabase.auth.signOut({ scope: 'local' });
         return { user: null, profile: null };
       }
       throw error;
