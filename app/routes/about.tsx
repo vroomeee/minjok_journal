@@ -5,7 +5,7 @@ import { RoleBadge } from "~/components/role-badge";
 
 export default function About() {
   const rootData = useRouteLoaderData("root") as
-    | { user?: { id: string; email?: string }; profile?: { role_type?: string | null; email?: string | null } }
+    | { user?: { id: string; email?: string }; profile?: { role_type: "mentor" | "mentee" | "admin" | "prof"; email: string | null } }
     | null;
   const user = rootData?.user;
   const profile = rootData?.profile;
