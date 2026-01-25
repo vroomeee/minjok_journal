@@ -15,6 +15,18 @@ import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
 import { useEffect, useRef } from "react";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { questionId } = params;
@@ -55,7 +67,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("question_id", questionId)
     .order("created_at", { ascending: true });
 
-  return { question, replies: replies || [] };
+  const formattedQuestion = { ...question, formattedDate: formatDate(question.created_at) };
+  const formattedReplies = (replies || []).map((r) => ({
+    ...r,
+    formattedDate: formatDate(r.created_at),
+  }));
+
+  return { question: formattedQuestion, replies: formattedReplies };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -201,7 +219,7 @@ export default function QnaDetail() {
                   <RoleBadge role={question.author.role_type} />
                 )}
                 <span className="muted">
-                  {new Date(question.created_at).toLocaleDateString()}
+                  {question.formattedDate}
                 </span>
               </div>
             </div>
@@ -295,7 +313,7 @@ export default function QnaDetail() {
                       />
                     )}
                     <span className="meta">
-                      {new Date(reply.created_at).toLocaleDateString()}
+                      {reply.formattedDate}
                     </span>
                   </div>
                   {(user?.id === reply.author_id || isAdmin) && (

@@ -5,6 +5,18 @@ import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { Link } from "react-router";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { userId } = params;
@@ -23,7 +35,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
-  return { profile, papers: papers || [] };
+  const formattedPapers = (papers || []).map((p) => ({
+    ...p,
+    formattedDate: formatDate(p.created_at),
+  }));
+
+  return { profile, papers: formattedPapers };
 }
 
 export default function ProfilePage() {
@@ -91,7 +108,7 @@ export default function ProfilePage() {
                         </h3>
                       </Link>
                       <p className="muted" style={{ margin: "2px 0" }}>
-                        {new Date(paper.created_at).toLocaleDateString()}
+                        {paper.formattedDate}
                       </p>
                     </div>
                     <span className="pill">{paper.status}</span>

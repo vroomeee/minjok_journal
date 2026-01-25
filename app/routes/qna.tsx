@@ -5,6 +5,18 @@ import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 // Loader for Q&A list (titles only)
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -32,7 +44,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: questions } = await query;
 
-  return { questions: questions || [], search };
+  const formattedQuestions = (questions || []).map((q) => ({
+    ...q,
+    formattedDate: formatDate(q.created_at),
+  }));
+
+  return { questions: formattedQuestions, search };
 }
 
 // No list-level mutations; keep action for compatibility
@@ -151,7 +168,7 @@ export default function QnA() {
                 <div className="row" style={{ gap: 6 }}>
                   {question.author && <RoleBadge role={question.author.role_type} />}
                   <span className="muted" style={{ fontSize: 13 }}>
-                    {new Date(question.created_at).toLocaleDateString()}
+                    {question.formattedDate}
                   </span>
                 </div>
               </div>

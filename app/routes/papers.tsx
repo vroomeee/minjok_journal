@@ -6,6 +6,18 @@ import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
 import { AuthorList } from "~/components/author-list";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 // Server-side loader to fetch all published papers
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -53,8 +65,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const totalPages = Math.ceil((count || 0) / perPage);
 
+  const formattedPapers = (papers || []).map((paper) => ({
+    ...paper,
+    formattedDate: formatDate(paper.created_at),
+  }));
+
   return {
-    papers: papers || [],
+    papers: formattedPapers,
     currentPage: page,
     totalPages,
     search,
@@ -197,7 +214,7 @@ export default function Papers() {
                     className="muted"
                     style={{ fontSize: 13, textAlign: "right" }}
                   >
-                    {new Date(paper.created_at).toLocaleDateString()}
+                    {paper.formattedDate}
                   </span>
                 </div>
               ))}

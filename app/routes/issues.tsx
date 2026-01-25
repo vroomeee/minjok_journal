@@ -1,4 +1,10 @@
-import { Form, Link, useActionData, useLoaderData, useRouteLoaderData } from "react-router";
+import {
+  Form,
+  Link,
+  useActionData,
+  useLoaderData,
+  useRouteLoaderData,
+} from "react-router";
 import type { Route } from "./+types/issues";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
@@ -6,6 +12,18 @@ import { UserLink } from "~/components/user-link";
 import { RoleBadge } from "~/components/role-badge";
 import { useState } from "react";
 import { AuthorList } from "~/components/author-list";
+
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
 
 type IssueRecord = {
   id: string;
@@ -19,7 +37,10 @@ type IssueRecord = {
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const url = new URL(request.url);
-  const availablePage = parseInt(url.searchParams.get("availablePage") || "1", 10);
+  const availablePage = parseInt(
+    url.searchParams.get("availablePage") || "1",
+    10,
+  );
   const availablePerPage = 50;
 
   const { data: attachedArticleRows = [] } = await supabase
@@ -27,7 +48,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("article_id");
 
   const attachedArticleIds = new Set(
-    attachedArticleRows.map((row) => row.article_id).filter(Boolean)
+    attachedArticleRows.map((row) => row.article_id).filter(Boolean),
   );
 
   const excludedList =
@@ -67,7 +88,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         issue_articles:issue_articles!left(article_id)(
           issue_id
         )
-      `
+      `,
     )
     .eq("status", "published");
 
@@ -79,13 +100,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("created_at", { ascending: false })
     .range(
       (availablePage - 1) * availablePerPage,
-      availablePage * availablePerPage - 1
+      availablePage * availablePerPage - 1,
     );
 
-  const {
-    data: issues = [],
-    error: issuesError,
-  } = await supabase
+  const { data: issues = [], error: issuesError } = await supabase
     .from("issues")
     .select("*")
     .order("created_at", { ascending: false });
@@ -97,7 +115,11 @@ export async function loader({ request }: Route.LoaderArgs) {
       id: string;
       title: string;
       created_at: string;
-      author?: { id: string; full_name: string | null; role_type: string | null };
+      author?: {
+        id: string;
+        full_name: string | null;
+        role_type: string | null;
+      };
     } | null;
   }[] = [];
 
@@ -122,7 +144,7 @@ export async function loader({ request }: Route.LoaderArgs) {
               )
             )
           )
-        `
+        `,
       )
       .in("issue_id", issueIds)
       .order("position", { ascending: true });
@@ -134,21 +156,27 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const issuesWithArticles = (issues || []).map((issue: IssueRecord) => ({
     ...issue,
+    formattedDate: formatDate(issue.release_date ?? issue.created_at),
     articles: issueArticles
       .filter((ia) => ia.issue_id === issue.id)
       .map((ia) => ia.article)
       .filter(Boolean),
   }));
 
+  const formattedPapers = (availablePapers || []).map((paper) => ({
+    ...paper,
+    formattedDate: formatDate(paper.created_at),
+  }));
+
   const schemaMissing = Boolean(issuesError);
 
   return {
-    publishedPapers: availablePapers,
+    publishedPapers: formattedPapers,
     issues: issuesWithArticles,
     availablePage,
     availableTotalPages: Math.max(
       1,
-      Math.ceil((availableCount || 0) / availablePerPage)
+      Math.ceil((availableCount || 0) / availablePerPage),
     ),
     schemaMissing,
   };
@@ -185,7 +213,9 @@ export async function action({ request }: Route.ActionArgs) {
     const description =
       ((formData.get("description") as string) || "").trim() || null;
     const status =
-      formData.get("status") === "draft" ? ("draft" as const) : ("released" as const);
+      formData.get("status") === "draft"
+        ? ("draft" as const)
+        : ("released" as const);
     const coverFile = formData.get("cover") as File | null;
     const articleIds = formData
       .getAll("paperIds")
@@ -200,7 +230,8 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "Cover image is required." };
     }
 
-    const release_date = status === "released" ? new Date().toISOString() : null;
+    const release_date =
+      status === "released" ? new Date().toISOString() : null;
 
     const { data: issue, error } = await supabase
       .from("issues")
@@ -237,7 +268,10 @@ export async function action({ request }: Route.ActionArgs) {
       const {
         data: { publicUrl },
       } = supabase.storage.from("covers").getPublicUrl(path);
-      await supabase.from("issues").update({ cover_url: publicUrl }).eq("id", issue.id);
+      await supabase
+        .from("issues")
+        .update({ cover_url: publicUrl })
+        .eq("id", issue.id);
     }
 
     return { success: true };
@@ -254,9 +288,10 @@ export default function IssuesPage() {
     availableTotalPages,
     schemaMissing,
   } = useLoaderData<typeof loader>();
-  const rootData = useRouteLoaderData("root") as
-    | { user?: { id: string }; profile?: { role_type?: string | null } }
-    | null;
+  const rootData = useRouteLoaderData("root") as {
+    user?: { id: string };
+    profile?: { role_type?: string | null };
+  } | null;
   const user = rootData?.user;
   const profile = rootData?.profile;
   const isAdmin = profile?.role_type === "admin";
@@ -269,11 +304,15 @@ export default function IssuesPage() {
 
       <div className="page-body">
         <div className="section">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", alignItems: "center" }}
+          >
             <div>
               <h1 style={{ fontSize: 22, margin: 0 }}>Issues</h1>
               <p className="muted" style={{ margin: 0 }}>
-                Group published papers into issues. Released issues can be bundled into volumes.
+                Group published papers into issues. Released issues can be
+                bundled into volumes.
               </p>
             </div>
             <Link to="/volumes" className="btn btn-ghost">
@@ -285,39 +324,58 @@ export default function IssuesPage() {
         {schemaMissing && (
           <div className="section-compact subtle" style={{ marginBottom: 10 }}>
             <p className="text-sm" style={{ margin: 0 }}>
-              Issues tables are missing in Supabase. Run the migration before using this page.
+              Issues tables are missing in Supabase. Run the migration before
+              using this page.
             </p>
           </div>
         )}
 
         {isAdmin && (
           <div className="section">
-            <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+            <div
+              className="row"
+              style={{ justifyContent: "space-between", marginBottom: 12 }}
+            >
               <div>
                 <h2 style={{ margin: 0, fontSize: 18 }}>Create Issue</h2>
                 <p className="muted" style={{ margin: 0 }}>
-                  Pick published papers and release immediately or save as draft.
+                  Pick published papers and release immediately or save as
+                  draft.
                 </p>
               </div>
               <span className="pill">Admin only</span>
             </div>
 
             {actionData?.error && (
-              <div className="section-compact subtle" style={{ marginBottom: 10 }}>
+              <div
+                className="section-compact subtle"
+                style={{ marginBottom: 10 }}
+              >
                 <p className="text-sm" style={{ color: "#f6b8bd", margin: 0 }}>
                   {actionData.error}
                 </p>
               </div>
             )}
             {actionData?.success && (
-              <div className="section-compact subtle" style={{ marginBottom: 10 }}>
-                <p className="text-sm" style={{ color: "var(--accent)", margin: 0 }}>
+              <div
+                className="section-compact subtle"
+                style={{ marginBottom: 10 }}
+              >
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--accent)", margin: 0 }}
+                >
                   Issue created.
                 </p>
               </div>
             )}
 
-            <Form method="post" encType="multipart/form-data" className="list" style={{ gap: 12 }}>
+            <Form
+              method="post"
+              encType="multipart/form-data"
+              className="list"
+              style={{ gap: 12 }}
+            >
               <input type="hidden" name="intent" value="create-issue" />
               <div className="row" style={{ gap: 12 }}>
                 <div style={{ flex: 2 }}>
@@ -332,7 +390,11 @@ export default function IssuesPage() {
                 </div>
                 <div style={{ width: 200 }}>
                   <label className="label">Status</label>
-                  <select name="status" className="input" defaultValue="released">
+                  <select
+                    name="status"
+                    className="input"
+                    defaultValue="released"
+                  >
                     <option value="released">release now</option>
                     <option value="draft">draft</option>
                   </select>
@@ -356,7 +418,9 @@ export default function IssuesPage() {
                   accept="image/*"
                   className="input"
                   required
-                  onChange={(e) => setCoverName(e.target.files?.[0]?.name || null)}
+                  onChange={(e) =>
+                    setCoverName(e.target.files?.[0]?.name || null)
+                  }
                 />
                 {coverName && (
                   <span className="muted text-sm">Selected: {coverName}</span>
@@ -370,7 +434,10 @@ export default function IssuesPage() {
                     No published papers yet.
                   </p>
                 ) : (
-                  <div className="section-compact" style={{ maxHeight: 320, overflow: "auto" }}>
+                  <div
+                    className="section-compact"
+                    style={{ maxHeight: 320, overflow: "auto" }}
+                  >
                     <div
                       className="section-compact"
                       style={{
@@ -389,7 +456,10 @@ export default function IssuesPage() {
                       <span className="muted" style={{ fontWeight: 600 }}>
                         Author
                       </span>
-                      <span className="muted" style={{ fontWeight: 600, textAlign: "right" }}>
+                      <span
+                        className="muted"
+                        style={{ fontWeight: 600, textAlign: "right" }}
+                      >
                         Date
                       </span>
                     </div>
@@ -405,18 +475,31 @@ export default function IssuesPage() {
                           cursor: "pointer",
                         }}
                       >
-                        <input type="checkbox" name="paperIds" value={paper.id} />
-                        <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          name="paperIds"
+                          value={paper.id}
+                        />
+                        <div
+                          className="row"
+                          style={{ gap: 6, alignItems: "center" }}
+                        >
                           <span style={{ fontWeight: 600 }}>{paper.title}</span>
-                          <span className="pill" style={{ background: "#103c2d" }}>
+                          <span
+                            className="pill"
+                            style={{ background: "#103c2d" }}
+                          >
                             Published
                           </span>
                         </div>
                         <div className="muted text-sm">
                           <AuthorList authors={paper.authors} />
                         </div>
-                        <div className="muted text-sm" style={{ textAlign: "right" }}>
-                          {new Date(paper.created_at).toLocaleDateString()}
+                        <div
+                          className="muted text-sm"
+                          style={{ textAlign: "right" }}
+                        >
+                          {paper.formattedDate}
                         </div>
                       </label>
                     ))}
@@ -443,7 +526,10 @@ export default function IssuesPage() {
                       className="btn btn-ghost"
                       aria-disabled={availablePage >= availableTotalPages}
                       style={{
-                        pointerEvents: availablePage >= availableTotalPages ? "none" : "auto",
+                        pointerEvents:
+                          availablePage >= availableTotalPages
+                            ? "none"
+                            : "auto",
                         opacity: availablePage >= availableTotalPages ? 0.5 : 1,
                       }}
                     >
@@ -453,7 +539,10 @@ export default function IssuesPage() {
                 )}
               </div>
 
-              <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+              <div
+                className="row"
+                style={{ justifyContent: "flex-end", gap: 8 }}
+              >
                 <button type="submit" className="btn btn-accent">
                   Create issue
                 </button>
@@ -463,7 +552,10 @@ export default function IssuesPage() {
         )}
 
         <div className="section">
-          <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", marginBottom: 10 }}
+          >
             <h2 style={{ margin: 0, fontSize: 18 }}>Released & draft issues</h2>
             <span className="muted text-sm">
               {issues.length} {issues.length === 1 ? "issue" : "issues"}
@@ -476,46 +568,87 @@ export default function IssuesPage() {
             </p>
           ) : (
             <div className="column" style={{ gap: 10 }}>
-            {issues.map((issue) => (
-              <div key={issue.id} className="section-compact" style={{ gap: 6 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                    {issue.cover_url && (
+              {issues.map((issue) => (
+                <div
+                  key={issue.id}
+                  className="section-compact"
+                  style={{ gap: 6 }}
+                >
+                  <div
+                    className="row"
+                    style={{
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div
+                      className="row"
+                      style={{ gap: 8, alignItems: "center" }}
+                    >
+                      {issue.cover_url && (
                         <img
                           src={issue.cover_url}
                           alt={`${issue.title} cover`}
-                          style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }}
+                          style={{
+                            width: 48,
+                            height: 48,
+                            objectFit: "cover",
+                            borderRadius: 6,
+                          }}
                         />
                       )}
                       <h3 style={{ margin: 0 }}>{issue.title}</h3>
                       <span
                         className="pill"
                         style={{
-                          background: issue.status === "released" ? "var(--accent-muted)" : "var(--surface-2)",
-                          color: issue.status === "released" ? "var(--accent-strong)" : "var(--text)",
+                          background:
+                            issue.status === "released"
+                              ? "var(--accent-muted)"
+                              : "var(--surface-2)",
+                          color:
+                            issue.status === "released"
+                              ? "var(--accent-strong)"
+                              : "var(--text)",
                         }}
                       >
                         {issue.status}
                       </span>
                     </div>
-                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                    <div
+                      className="row"
+                      style={{ gap: 8, alignItems: "center" }}
+                    >
                       <span className="muted text-sm">
-                        {issue.release_date
-                          ? new Date(issue.release_date).toLocaleDateString()
-                          : new Date(issue.created_at).toLocaleDateString()}
+                        {issue.formattedDate}
                       </span>
                       {isAdmin && (
                         <Form
                           method="post"
                           onSubmit={(e) => {
-                            if (!confirm("Delete this issue? Papers will simply become available again.")) {
+                            if (
+                              !confirm(
+                                "Delete this issue? Papers will simply become available again.",
+                              )
+                            ) {
                               e.preventDefault();
                             }
                           }}
                         >
-                          <input type="hidden" name="intent" value="delete-issue" />
-                          <input type="hidden" name="issueId" value={issue.id} />
-                          <button type="submit" className="btn btn-ghost" style={{ color: "#f6b8bd" }}>
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="delete-issue"
+                          />
+                          <input
+                            type="hidden"
+                            name="issueId"
+                            value={issue.id}
+                          />
+                          <button
+                            type="submit"
+                            className="btn btn-ghost"
+                            style={{ color: "#f6b8bd" }}
+                          >
                             Delete
                           </button>
                         </Form>
@@ -538,21 +671,36 @@ export default function IssuesPage() {
                           <div
                             key={article.id}
                             className="row"
-                            style={{ justifyContent: "space-between", alignItems: "center" }}
+                            style={{
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
                           >
-                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              <Link to={`/papers/${article.id}`} className="nav-link" style={{ padding: 0 }}>
+                            <div
+                              className="row"
+                              style={{ gap: 8, alignItems: "center" }}
+                            >
+                              <Link
+                                to={`/papers/${article.id}`}
+                                className="nav-link"
+                                style={{ padding: 0 }}
+                              >
                                 {article.title}
                               </Link>
                               {article.authors?.[0]?.profile?.role_type && (
-                                <RoleBadge role={article.authors[0].profile.role_type} />
+                                <RoleBadge
+                                  role={article.authors[0].profile.role_type}
+                                />
                               )}
                             </div>
-                            <div className="muted text-sm" style={{ textAlign: "right" }}>
+                            <div
+                              className="muted text-sm"
+                              style={{ textAlign: "right" }}
+                            >
                               <AuthorList authors={article.authors} />
                             </div>
                           </div>
-                        ) : null
+                        ) : null,
                       )
                     )}
                   </div>

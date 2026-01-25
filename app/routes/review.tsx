@@ -5,6 +5,18 @@ import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { AuthorList } from "~/components/author-list";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
@@ -45,7 +57,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("status", "in_review")
     .order("updated_at", { ascending: false });
 
-  return { papers: papers || [], user, profile };
+  const formattedPapers = (papers || []).map((paper) => ({
+    ...paper,
+    formattedDate: formatDate(paper.updated_at),
+  }));
+
+  return { papers: formattedPapers, user, profile };
 }
 
 export default function ReviewQueue() {
@@ -102,8 +119,7 @@ export default function ReviewQueue() {
                         <RoleBadge role={paper.authors[0].profile.role_type} />
                       )}
                       <span className="muted" style={{ fontSize: 13 }}>
-                        Submitted:{" "}
-                        {new Date(paper.updated_at).toLocaleDateString()}
+                        Submitted: {paper.formattedDate}
                       </span>
                     </div>
                     {paper.current_version && (

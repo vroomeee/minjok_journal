@@ -19,6 +19,18 @@ import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
 import { AuthorList } from "~/components/author-list";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 // Server-side loader to fetch paper details
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -106,9 +118,22 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     publishedFileUrl = urlData.publicUrl;
   }
 
+  const formattedPaper = {
+    ...paper,
+    formattedDate: formatDate(paper.created_at),
+    versions: paper.versions?.map((v) => ({
+      ...v,
+      formattedDate: formatDate(v.created_at),
+    })),
+  };
+  const formattedComments = comments.map((c) => ({
+    ...c,
+    formattedDate: formatDate(c.created_at),
+  }));
+
   return {
-    paper,
-    comments,
+    paper: formattedPaper,
+    comments: formattedComments,
     activeVersionId,
     publishedVersion,
     publishedFileUrl,
@@ -417,7 +442,7 @@ export default function PaperDetail() {
           >
             <AuthorList authors={paper.authors} showBadges />
             <span className="meta">
-              {new Date(paper.created_at).toLocaleDateString()}
+              {paper.formattedDate}
             </span>
           </div>
           {paper.description && (
@@ -531,7 +556,7 @@ export default function PaperDetail() {
                               )}
                           </div>
                           <p className="meta" style={{ margin: "2px 0" }}>
-                            {new Date(version.created_at).toLocaleDateString()}
+                            {version.formattedDate}
                           </p>
                           <p className="muted" style={{ margin: "2px 0" }}>
                             {version.file_name}
@@ -661,7 +686,7 @@ export default function PaperDetail() {
                       />
                     )}
                     <span className="meta">
-                      {new Date(comment.created_at).toLocaleDateString()}
+                      {comment.formattedDate}
                     </span>
                     {(user?.id === comment.author_id ||
                       profile?.role_type === "admin") && (

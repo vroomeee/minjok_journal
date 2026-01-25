@@ -4,6 +4,18 @@ import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { AuthorList } from "~/components/author-list";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
@@ -38,7 +50,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("authors.profile_id", user.id)
     .order("created_at", { ascending: false });
 
-  return { papers: papers || [], user, profile };
+  const formattedPapers = (papers || []).map((paper) => ({
+    ...paper,
+    formattedDate: formatDate(paper.created_at),
+  }));
+
+  return { papers: formattedPapers, user, profile };
 }
 
 export default function MyPapers() {
@@ -86,7 +103,7 @@ export default function MyPapers() {
                       </span>
                       <AuthorList authors={paper.authors} />
                       <span className="muted" style={{ fontSize: 13 }}>
-                        {new Date(paper.created_at).toLocaleDateString()}
+                        {paper.formattedDate}
                       </span>
                     </div>
                   </div>

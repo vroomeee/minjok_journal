@@ -14,6 +14,18 @@ import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef, useState } from "react";
 import { UserLink } from "~/components/user-link";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { postId } = params;
@@ -53,9 +65,15 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .is("parent_id", null)
     .order("created_at", { ascending: true });
 
+  const formattedPost = { ...post, formattedDate: formatDate(post.created_at) };
+  const formattedComments = (comments || []).map((c) => ({
+    ...c,
+    formattedDate: formatDate(c.created_at),
+  }));
+
   return {
-    post,
-    comments: comments || [],
+    post: formattedPost,
+    comments: formattedComments,
   };
 }
 
@@ -245,7 +263,7 @@ export default function BoardPost() {
               <span className="pill">Admin</span>
             )}
             <span className="meta">
-              {new Date(post.created_at).toLocaleDateString()}
+              {post.formattedDate}
             </span>
           </div>
           <div
@@ -327,7 +345,7 @@ export default function BoardPost() {
                     />
                   )}
                   <span className="meta">
-                    {new Date(comment.created_at).toLocaleDateString()}
+                    {comment.formattedDate}
                   </span>
                   {(user?.id === comment.author_id ||
                     profile?.role_type === "admin") && (

@@ -4,6 +4,18 @@ import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { useState } from "react";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 type VolumeRecord = {
   id: string;
   title: string;
@@ -130,16 +142,22 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const volumesWithIssues = (volumes || []).map((volume: VolumeRecord) => ({
     ...volume,
+    formattedDate: formatDate(volume.release_date ?? volume.created_at),
     issues: volumeIssues
       .filter((vi) => vi.volume_id === volume.id)
-      .map((vi) => vi.issue)
+      .map((vi) => vi.issue ? { ...vi.issue, formattedReleaseDate: formatDate(vi.issue.release_date) } : null)
       .filter(Boolean),
+  }));
+
+  const formattedReleasedIssues = (releasedIssues || []).map((issue) => ({
+    ...issue,
+    formattedReleaseDate: formatDate(issue.release_date),
   }));
 
   const schemaMissing = Boolean(volumesError || issuesError);
 
   return {
-    releasedIssues,
+    releasedIssues: formattedReleasedIssues,
     availablePage,
     availableTotalPages: Math.max(
       1,
@@ -419,9 +437,7 @@ export default function VolumesPage() {
                           </div>
                         </div>
                         <div className="muted text-sm" style={{ textAlign: "right" }}>
-                          {issue.release_date
-                            ? new Date(issue.release_date).toLocaleDateString()
-                            : "n/a"}
+                          {issue.formattedReleaseDate}
                         </div>
                       </label>
                     ))}
@@ -505,9 +521,7 @@ export default function VolumesPage() {
                     </div>
                     <div className="row" style={{ gap: 8, alignItems: "center" }}>
                       <span className="muted text-sm">
-                        {volume.release_date
-                          ? new Date(volume.release_date).toLocaleDateString()
-                          : new Date(volume.created_at).toLocaleDateString()}
+                        {volume.formattedDate}
                       </span>
                       {isAdmin && (
                         <Form
@@ -550,9 +564,7 @@ export default function VolumesPage() {
                               <span className="pill subtle">{issue.status}</span>
                             </div>
                             <span className="muted text-sm" style={{ textAlign: "right" }}>
-                              {issue.release_date
-                                ? new Date(issue.release_date).toLocaleDateString()
-                                : "n/a"}
+                              {issue.formattedReleaseDate}
                             </span>
                           </div>
                         ) : null

@@ -5,6 +5,18 @@ import { Nav } from "~/components/nav";
 import { useRef } from "react";
 import { UserLink } from "~/components/user-link";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const url = new URL(request.url);
@@ -37,8 +49,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const totalPages = Math.ceil((count || 0) / perPage);
 
+  const formattedPosts = (posts || []).map((post) => ({
+    ...post,
+    formattedDate: formatDate(post.created_at),
+  }));
+
   return {
-    posts: posts || [],
+    posts: formattedPosts,
     currentPage: page,
     totalPages,
     search,
@@ -170,7 +187,7 @@ export default function Board() {
                     <UserLink user={post.author} fallback="Unknown" />
                   </span>
                   <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
-                    {new Date(post.created_at).toLocaleDateString()}
+                    {post.formattedDate}
                   </span>
                 </div>
               ))}

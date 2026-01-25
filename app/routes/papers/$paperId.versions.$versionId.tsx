@@ -19,6 +19,18 @@ import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef } from "react";
 import { UserLink } from "~/components/user-link";
 
+const dateFmt = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "n/a";
+  return dateFmt.format(new Date(dateStr));
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { paperId, versionId } = params;
@@ -101,12 +113,22 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .select("id")
     .eq("article_id", paperId);
 
+  const formattedVersion = { ...version, formattedDate: formatDate(version.created_at) };
+  const formattedComments = (comments || []).map((c) => ({
+    ...c,
+    formattedDate: formatDate(c.created_at),
+  }));
+  const formattedReplies = replies.map((r) => ({
+    ...r,
+    formattedDate: formatDate(r.created_at),
+  }));
+
   return {
     paper,
-    version,
+    version: formattedVersion,
     fileUrl,
-    comments: comments || [],
-    replies,
+    comments: formattedComments,
+    replies: formattedReplies,
     totalVersions: versionList?.length || 0,
   };
 }
@@ -371,7 +393,7 @@ export default function VersionReview() {
                 {paper?.title} - Version {version.version_number}
               </h2>
               <p className="muted" style={{ margin: "4px 0" }}>
-                Uploaded: {new Date(version.created_at).toLocaleDateString()}
+                Uploaded: {version.formattedDate}
               </p>
             </div>
             {canDeleteVersion && (
@@ -414,26 +436,25 @@ export default function VersionReview() {
                   className="textarea"
                   placeholder="Add context about the changes in this version..."
                 />
-                <div className="row">
-                  <button type="submit" className="btn btn-accent">
-                    Save Notes
-                  </button>
-                  {version.notes && (
-                    <Form
-                      method="post"
-                      onSubmit={(e) =>
-                        !confirm("Remove the notes for this version?") &&
-                        e.preventDefault()
-                      }
-                    >
-                      <input type="hidden" name="intent" value="deleteNotes" />
-                      <button type="submit" className="btn btn-ghost">
-                        Delete Notes
-                      </button>
-                    </Form>
-                  )}
-                </div>
+                <button type="submit" className="btn btn-accent">
+                  Save Notes
+                </button>
               </Form>
+              {version.notes && (
+                <Form
+                  method="post"
+                  style={{ marginTop: 8 }}
+                  onSubmit={(e) =>
+                    !confirm("Remove the notes for this version?") &&
+                    e.preventDefault()
+                  }
+                >
+                  <input type="hidden" name="intent" value="deleteNotes" />
+                  <button type="submit" className="btn btn-ghost">
+                    Delete Notes
+                  </button>
+                </Form>
+              )}
             </div>
           )}
 
@@ -529,7 +550,7 @@ export default function VersionReview() {
                       />
                     )}
                     <span className="meta">
-                      {new Date(comment.created_at).toLocaleDateString()}
+                      {comment.formattedDate}
                     </span>
                     {(user?.id === comment.author_id || isAdmin) && (
                       <div className="row" style={{ gap: 6 }}>
@@ -628,7 +649,7 @@ export default function VersionReview() {
                               />
                             )}
                             <span className="meta">
-                              {new Date(reply.created_at).toLocaleDateString()}
+                              {reply.formattedDate}
                             </span>
                           </div>
                           <p className="muted" style={{ marginTop: 4 }}>
