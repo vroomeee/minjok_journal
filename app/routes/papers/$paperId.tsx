@@ -169,6 +169,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
+    // Remove from issue_articles first (cleanup junction table)
+    await supabase.from("issue_articles").delete().eq("article_id", paperId);
+
     // Remove storage objects for all versions of this paper
     const { data: versionPaths } = await supabase
       .from("article_versions")
@@ -229,6 +232,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (paper.status !== "published" && paper.status !== "in_review") {
       return { error: "Only published or in-review papers can be unpublished" };
     }
+
+    // Remove from issue_articles (unpublished papers shouldn't be in issues)
+    await supabase.from("issue_articles").delete().eq("article_id", paperId);
 
     const { error } = await supabase
       .from("articles")

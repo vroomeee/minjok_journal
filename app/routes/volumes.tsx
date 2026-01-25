@@ -189,6 +189,8 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "delete-volume") {
     if (!volumeId) return { error: "Missing volume" };
+    // Remove from volume_issues first (cleanup junction table)
+    await supabase.from("volume_issues").delete().eq("volume_id", volumeId);
     const { error } = await supabase.from("volumes").delete().eq("id", volumeId);
     if (error) return { error: "Failed to delete volume." };
     return { success: "deleted" as const };
