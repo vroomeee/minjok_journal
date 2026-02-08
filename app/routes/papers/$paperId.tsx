@@ -14,6 +14,7 @@ import {
   createSupabaseServerClient,
   getUserProfile,
 } from "~/lib/supabase.server";
+import { cleanupIssuesAndVolumes } from "~/lib/issues";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { UserLink } from "~/components/user-link";
@@ -185,8 +186,19 @@ export async function action({ request, params }: Route.ActionArgs) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
+    const { data: issueRows } = await supabase
+      .from("issue_articles")
+      .select("issue_id")
+      .eq("article_id", paperId);
+    const affectedIssues = Array.from(
+      new Set(
+        issueRows?.map((row) => row.issue_id).filter(Boolean) ?? [],
+      ),
+    );
+
     // Remove from issue_articles first (cleanup junction table)
     await supabase.from("issue_articles").delete().eq("article_id", paperId);
+    await cleanupIssuesAndVolumes(supabase, affectedIssues);
 
     // Remove storage objects for all versions of this paper
     const { data: versionPaths } = await supabase
@@ -254,8 +266,19 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Only published or in-review papers can be unpublished" };
     }
 
+    const { data: issueRows } = await supabase
+      .from("issue_articles")
+      .select("issue_id")
+      .eq("article_id", paperId);
+    const affectedIssues = Array.from(
+      new Set(
+        issueRows?.map((row) => row.issue_id).filter(Boolean) ?? [],
+      ),
+    );
+
     // Remove from issue_articles (unpublished papers shouldn't be in issues)
     await supabase.from("issue_articles").delete().eq("article_id", paperId);
+    await cleanupIssuesAndVolumes(supabase, affectedIssues);
 
     const { error } = await supabase
       .from("articles")

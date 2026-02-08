@@ -5,12 +5,16 @@ import {
   useLoaderData,
 } from "react-router";
 import type { Route } from "./+types/issues";
-import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
+import {
+  createSupabaseServerClient,
+  requireUser,
+} from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { useState } from "react";
 import { AuthorList } from "~/components/author-list";
 import { useRootLoaderData } from "~/lib/root-data";
+import { cleanupIssuesAndVolumes } from "~/lib/issues";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -222,11 +226,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "delete-issue") {
     if (!issueId) return { error: "Missing issue" };
-    // Remove from junction tables first (cleanup)
-    await supabase.from("volume_issues").delete().eq("issue_id", issueId);
-    await supabase.from("issue_articles").delete().eq("issue_id", issueId);
-    const { error } = await supabase.from("issues").delete().eq("id", issueId);
-    if (error) return { error: "Failed to delete issue" };
+    await cleanupIssuesAndVolumes(supabase, [issueId], { force: true });
     return { success: true };
   }
 
