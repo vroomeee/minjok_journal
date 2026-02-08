@@ -1,3 +1,4 @@
 {
-  "framework": "react-router"
+  "framework": "react-router",
+  "regions": ["icn1"]
 }

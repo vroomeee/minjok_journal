@@ -30,41 +30,45 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { postId } = params;
 
-  const { data: post, error } = await supabase
-    .from("board_posts")
-    .select(
+  const [postResult, commentsResult] = await Promise.all([
+    supabase
+      .from("board_posts")
+      .select(
+        `
+        *,
+        author:profiles!author_id (
+          id,
+          email,
+          full_name,
+          role_type
+        )
       `
-      *,
-      author:profiles!author_id (
-        id,
-        email,
-        full_name,
-        role_type
       )
-    `
-    )
-    .eq("id", postId)
-    .single();
+      .eq("id", postId)
+      .single(),
+    supabase
+      .from("comments")
+      .select(
+        `
+        *,
+        author:profiles!author_id (
+          id,
+          email,
+          full_name,
+          role_type
+        )
+      `
+      )
+      .eq("article_id", postId)
+      .eq("comment_type", "board")
+      .is("parent_id", null)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const { data: post, error } = postResult;
+  const { data: comments } = commentsResult;
 
   if (error || !post) throw new Response("Post not found", { status: 404 });
-
-  const { data: comments } = await supabase
-    .from("comments")
-    .select(
-      `
-      *,
-      author:profiles!author_id (
-        id,
-        email,
-        full_name,
-        role_type
-      )
-    `
-    )
-    .eq("article_id", postId)
-    .eq("comment_type", "board")
-    .is("parent_id", null)
-    .order("created_at", { ascending: true });
 
   const formattedPost = { ...post, formattedDate: formatDate(post.created_at) };
   const formattedComments = (comments || []).map((c) => ({

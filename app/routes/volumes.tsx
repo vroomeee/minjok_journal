@@ -32,9 +32,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   const availablePage = parseInt(url.searchParams.get("availablePage") || "1", 10);
   const availablePerPage = 50;
 
-  const { data: attachedVolumeIssueRows = [] } = await supabase
-    .from("volume_issues")
-    .select("issue_id");
+  // Fire independent queries in parallel: attached IDs (for exclusion) + volumes list
+  const [{ data: attachedVolumeIssueRows = [] }, { data: volumes = [], error: volumesError }] =
+    await Promise.all([
+      supabase.from("volume_issues").select("issue_id"),
+      supabase
+        .from("volumes")
+        .select("id,title,description,status,created_at,release_date,cover_url")
+        .order("created_at", { ascending: false }),
+    ]);
 
   const attachedIssueIds = new Set(
     attachedVolumeIssueRows.map((row) => row.issue_id).filter(Boolean)
@@ -83,10 +89,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     dataQuery = dataQuery.not("id", "in", `(${excludedList})`);
   }
 
+  // Now run the dependent queries in parallel: available issues + volume_issues for volumes
+  const volumeIds = (volumes || []).map((v) => v.id);
+
   const [
     { count: availableCount, error: issuesError },
     { data: releasedIssues = [] },
-    { data: volumes = [], error: volumesError },
+    volumeIssuesResult,
   ] = await Promise.all([
     countQuery,
     dataQuery
@@ -95,46 +104,27 @@ export async function loader({ request }: Route.LoaderArgs) {
         (availablePage - 1) * availablePerPage,
         availablePage * availablePerPage - 1
       ),
-    supabase
-      .from("volumes")
-      .select(
-        "id,title,description,status,created_at,release_date,cover_url"
-      )
-      .order("created_at", { ascending: false }),
+    volumeIds.length
+      ? supabase
+          .from("volume_issues")
+          .select(
+            `
+              volume_id,
+              position,
+              issue:issues(
+                id,
+                title,
+                release_date,
+                status
+              )
+            `
+          )
+          .in("volume_id", volumeIds)
+          .order("position", { ascending: true })
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
-  let volumeIssues: {
-    volume_id: string;
-    position: number | null;
-    issue: {
-      id: string;
-      title: string;
-      release_date: string | null;
-      status: string;
-    } | null;
-  }[] = [];
-
-  const volumeIds = (volumes || []).map((v) => v.id);
-  if (volumeIds.length) {
-    const { data } = await supabase
-      .from("volume_issues")
-      .select(
-        `
-          volume_id,
-          position,
-          issue:issues(
-            id,
-            title,
-            release_date,
-            status
-          )
-        `
-      )
-      .in("volume_id", volumeIds)
-      .order("position", { ascending: true });
-
-    if (data) volumeIssues = data;
-  }
+  const volumeIssues = volumeIssuesResult.data || [];
 
   const volumesWithIssues = (volumes || []).map((volume: VolumeRecord) => ({
     ...volume,
