@@ -5,6 +5,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  useNavigation,
 } from "react-router";
 import type { Route } from "./+types/root";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
@@ -75,9 +76,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function Root() {
   const data = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const isLoading = navigation.state === "loading";
 
   return (
     <>
+      {isLoading && <div className="global-loading-bar" />}
       <Outlet />
       <script
         dangerouslySetInnerHTML={{

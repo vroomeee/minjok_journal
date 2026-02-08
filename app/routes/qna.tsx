@@ -39,7 +39,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("created_at", { ascending: false });
 
   if (search) {
-    query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+    const escaped = search.replace(/[%_,]/g, "");
+    query = query.or(`title.ilike.%${escaped}%,content.ilike.%${escaped}%`);
   }
 
   const { data: questions } = await query;

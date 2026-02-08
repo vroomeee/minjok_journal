@@ -1,6 +1,6 @@
 import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/my-papers";
-import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
+import { getUserProfile, createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { AuthorList } from "~/components/author-list";
 
@@ -17,14 +17,8 @@ function formatDate(dateStr: string | null): string {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireUser(request);
+  const { user, profile } = await getUserProfile(request);
   const { supabase } = createSupabaseServerClient(request);
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
 
   const { data: papers } = await supabase
     .from("articles")

@@ -15,7 +15,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, email, role_type")
-    .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`)
+    .or(`full_name.ilike.%${q.replace(/[%_,]/g, "")}%,email.ilike.%${q.replace(/[%_,]/g, "")}%`)
     .neq("id", excludeId || "")
     .limit(10);
 

@@ -1,0 +1,783 @@
+{
+  "buildManifest": {
+    "serverBundles": {
+      "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0": {
+        "id": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+        "file": "build/server/nodejs_eyJydW50aW1lIjoibm9kZWpzIn0/index.js",
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    },
+    "routeIdToServerBundleId": {
+      "routes/home": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/about": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/signup": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/logout": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/forgot-password": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/reset-password": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/confirm": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/error": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth/resend": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/papers": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/papers/new": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/papers/$paperId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/papers/$paperId.publish": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/papers/$paperId.edit": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/papers/$paperId.new-version": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/papers/$paperId.versions.$versionId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/my-papers": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/review": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/profile/$userId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/profile/$userId.edit": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/qna": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/qna/new": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/qna/$questionId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/qna/$questionId.edit": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/qna/reply/$replyId.edit": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/board": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/board/new": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/board/$postId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/board/$postId.edit": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.search-profiles": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/issues": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/issues.$issueId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/volumes": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/volumes.$volumeId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+    },
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "app/root.tsx",
+        "path": "",
+        "config": {}
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "app/routes/home.tsx",
+        "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/about": {
+        "id": "routes/about",
+        "parentId": "root",
+        "file": "app/routes/about.tsx",
+        "path": "about",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/login": {
+        "id": "routes/auth/login",
+        "parentId": "root",
+        "file": "app/routes/auth/login.tsx",
+        "path": "auth/login",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/signup": {
+        "id": "routes/auth/signup",
+        "parentId": "root",
+        "file": "app/routes/auth/signup.tsx",
+        "path": "auth/signup",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/logout": {
+        "id": "routes/auth/logout",
+        "parentId": "root",
+        "file": "app/routes/auth/logout.tsx",
+        "path": "auth/logout",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/forgot-password": {
+        "id": "routes/auth/forgot-password",
+        "parentId": "root",
+        "file": "app/routes/auth/forgot-password.tsx",
+        "path": "auth/forgot-password",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/reset-password": {
+        "id": "routes/auth/reset-password",
+        "parentId": "root",
+        "file": "app/routes/auth/reset-password.tsx",
+        "path": "auth/reset-password",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/confirm": {
+        "id": "routes/auth/confirm",
+        "parentId": "root",
+        "file": "app/routes/auth/confirm.tsx",
+        "path": "auth/confirm",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/error": {
+        "id": "routes/auth/error",
+        "parentId": "root",
+        "file": "app/routes/auth/error.tsx",
+        "path": "auth/error",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth/resend": {
+        "id": "routes/auth/resend",
+        "parentId": "root",
+        "file": "app/routes/auth/resend.tsx",
+        "path": "auth/resend",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/papers": {
+        "id": "routes/papers",
+        "parentId": "root",
+        "file": "app/routes/papers.tsx",
+        "path": "papers",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/papers/new": {
+        "id": "routes/papers/new",
+        "parentId": "root",
+        "file": "app/routes/papers/new.tsx",
+        "path": "papers/new",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/papers/$paperId": {
+        "id": "routes/papers/$paperId",
+        "parentId": "root",
+        "file": "app/routes/papers/$paperId.tsx",
+        "path": "papers/:paperId",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/papers/$paperId.publish": {
+        "id": "routes/papers/$paperId.publish",
+        "parentId": "root",
+        "file": "app/routes/papers/$paperId.publish.tsx",
+        "path": "papers/:paperId/publish",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/papers/$paperId.edit": {
+        "id": "routes/papers/$paperId.edit",
+        "parentId": "root",
+        "file": "app/routes/papers/$paperId.edit.tsx",
+        "path": "papers/:paperId/edit",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/papers/$paperId.new-version": {
+        "id": "routes/papers/$paperId.new-version",
+        "parentId": "root",
+        "file": "app/routes/papers/$paperId.new-version.tsx",
+        "path": "papers/:paperId/new-version",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/papers/$paperId.versions.$versionId": {
+        "id": "routes/papers/$paperId.versions.$versionId",
+        "parentId": "root",
+        "file": "app/routes/papers/$paperId.versions.$versionId.tsx",
+        "path": "papers/:paperId/versions/:versionId",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/my-papers": {
+        "id": "routes/my-papers",
+        "parentId": "root",
+        "file": "app/routes/my-papers.tsx",
+        "path": "my-papers",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/review": {
+        "id": "routes/review",
+        "parentId": "root",
+        "file": "app/routes/review.tsx",
+        "path": "review",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/profile/$userId": {
+        "id": "routes/profile/$userId",
+        "parentId": "root",
+        "file": "app/routes/profile/$userId.tsx",
+        "path": "profile/:userId",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/profile/$userId.edit": {
+        "id": "routes/profile/$userId.edit",
+        "parentId": "root",
+        "file": "app/routes/profile/$userId.edit.tsx",
+        "path": "profile/:userId/edit",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/qna": {
+        "id": "routes/qna",
+        "parentId": "root",
+        "file": "app/routes/qna.tsx",
+        "path": "qna",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/qna/new": {
+        "id": "routes/qna/new",
+        "parentId": "root",
+        "file": "app/routes/qna/new.tsx",
+        "path": "qna/new",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/qna/$questionId": {
+        "id": "routes/qna/$questionId",
+        "parentId": "root",
+        "file": "app/routes/qna/$questionId.tsx",
+        "path": "qna/:questionId",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/qna/$questionId.edit": {
+        "id": "routes/qna/$questionId.edit",
+        "parentId": "root",
+        "file": "app/routes/qna/$questionId.edit.tsx",
+        "path": "qna/:questionId/edit",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/qna/reply/$replyId.edit": {
+        "id": "routes/qna/reply/$replyId.edit",
+        "parentId": "root",
+        "file": "app/routes/qna/reply/$replyId.edit.tsx",
+        "path": "qna/reply/:replyId/edit",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/board": {
+        "id": "routes/board",
+        "parentId": "root",
+        "file": "app/routes/board.tsx",
+        "path": "board",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/board/new": {
+        "id": "routes/board/new",
+        "parentId": "root",
+        "file": "app/routes/board/new.tsx",
+        "path": "board/new",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/board/$postId": {
+        "id": "routes/board/$postId",
+        "parentId": "root",
+        "file": "app/routes/board/$postId.tsx",
+        "path": "board/:postId",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/board/$postId.edit": {
+        "id": "routes/board/$postId.edit",
+        "parentId": "root",
+        "file": "app/routes/board/$postId.edit.tsx",
+        "path": "board/:postId/edit",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/api.search-profiles": {
+        "id": "routes/api.search-profiles",
+        "parentId": "root",
+        "file": "app/routes/api.search-profiles.tsx",
+        "path": "api/search-profiles",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/issues": {
+        "id": "routes/issues",
+        "parentId": "root",
+        "file": "app/routes/issues.tsx",
+        "path": "issues",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/issues.$issueId": {
+        "id": "routes/issues.$issueId",
+        "parentId": "root",
+        "file": "app/routes/issues.$issueId.tsx",
+        "path": "issues/:issueId",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/volumes": {
+        "id": "routes/volumes",
+        "parentId": "root",
+        "file": "app/routes/volumes.tsx",
+        "path": "volumes",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/volumes.$volumeId": {
+        "id": "routes/volumes.$volumeId",
+        "parentId": "root",
+        "file": "app/routes/volumes.$volumeId.tsx",
+        "path": "volumes/:volumeId",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/admin": {
+        "id": "routes/admin",
+        "parentId": "root",
+        "file": "app/routes/admin.tsx",
+        "path": "admin",
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    }
+  },
+  "reactRouterConfig": {
+    "appDirectory": "C:/proprofr/new/MinjokJournal/app",
+    "basename": "/",
+    "buildDirectory": "C:/proprofr/new/MinjokJournal/build",
+    "future": {
+      "unstable_optimizeDeps": false,
+      "unstable_subResourceIntegrity": false,
+      "v8_middleware": false,
+      "v8_splitRouteModules": false,
+      "v8_viteEnvironmentApi": false
+    },
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "root.tsx",
+        "path": ""
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "routes/home.tsx",
+        "index": true
+      },
+      "routes/about": {
+        "id": "routes/about",
+        "parentId": "root",
+        "file": "routes/about.tsx",
+        "path": "about"
+      },
+      "routes/auth/login": {
+        "id": "routes/auth/login",
+        "parentId": "root",
+        "file": "routes/auth/login.tsx",
+        "path": "auth/login"
+      },
+      "routes/auth/signup": {
+        "id": "routes/auth/signup",
+        "parentId": "root",
+        "file": "routes/auth/signup.tsx",
+        "path": "auth/signup"
+      },
+      "routes/auth/logout": {
+        "id": "routes/auth/logout",
+        "parentId": "root",
+        "file": "routes/auth/logout.tsx",
+        "path": "auth/logout"
+      },
+      "routes/auth/forgot-password": {
+        "id": "routes/auth/forgot-password",
+        "parentId": "root",
+        "file": "routes/auth/forgot-password.tsx",
+        "path": "auth/forgot-password"
+      },
+      "routes/auth/reset-password": {
+        "id": "routes/auth/reset-password",
+        "parentId": "root",
+        "file": "routes/auth/reset-password.tsx",
+        "path": "auth/reset-password"
+      },
+      "routes/auth/confirm": {
+        "id": "routes/auth/confirm",
+        "parentId": "root",
+        "file": "routes/auth/confirm.tsx",
+        "path": "auth/confirm"
+      },
+      "routes/auth/error": {
+        "id": "routes/auth/error",
+        "parentId": "root",
+        "file": "routes/auth/error.tsx",
+        "path": "auth/error"
+      },
+      "routes/auth/resend": {
+        "id": "routes/auth/resend",
+        "parentId": "root",
+        "file": "routes/auth/resend.tsx",
+        "path": "auth/resend"
+      },
+      "routes/papers": {
+        "id": "routes/papers",
+        "parentId": "root",
+        "file": "routes/papers.tsx",
+        "path": "papers"
+      },
+      "routes/papers/new": {
+        "id": "routes/papers/new",
+        "parentId": "root",
+        "file": "routes/papers/new.tsx",
+        "path": "papers/new"
+      },
+      "routes/papers/$paperId": {
+        "id": "routes/papers/$paperId",
+        "parentId": "root",
+        "file": "routes/papers/$paperId.tsx",
+        "path": "papers/:paperId"
+      },
+      "routes/papers/$paperId.publish": {
+        "id": "routes/papers/$paperId.publish",
+        "parentId": "root",
+        "file": "routes/papers/$paperId.publish.tsx",
+        "path": "papers/:paperId/publish"
+      },
+      "routes/papers/$paperId.edit": {
+        "id": "routes/papers/$paperId.edit",
+        "parentId": "root",
+        "file": "routes/papers/$paperId.edit.tsx",
+        "path": "papers/:paperId/edit"
+      },
+      "routes/papers/$paperId.new-version": {
+        "id": "routes/papers/$paperId.new-version",
+        "parentId": "root",
+        "file": "routes/papers/$paperId.new-version.tsx",
+        "path": "papers/:paperId/new-version"
+      },
+      "routes/papers/$paperId.versions.$versionId": {
+        "id": "routes/papers/$paperId.versions.$versionId",
+        "parentId": "root",
+        "file": "routes/papers/$paperId.versions.$versionId.tsx",
+        "path": "papers/:paperId/versions/:versionId"
+      },
+      "routes/my-papers": {
+        "id": "routes/my-papers",
+        "parentId": "root",
+        "file": "routes/my-papers.tsx",
+        "path": "my-papers"
+      },
+      "routes/review": {
+        "id": "routes/review",
+        "parentId": "root",
+        "file": "routes/review.tsx",
+        "path": "review"
+      },
+      "routes/profile/$userId": {
+        "id": "routes/profile/$userId",
+        "parentId": "root",
+        "file": "routes/profile/$userId.tsx",
+        "path": "profile/:userId"
+      },
+      "routes/profile/$userId.edit": {
+        "id": "routes/profile/$userId.edit",
+        "parentId": "root",
+        "file": "routes/profile/$userId.edit.tsx",
+        "path": "profile/:userId/edit"
+      },
+      "routes/qna": {
+        "id": "routes/qna",
+        "parentId": "root",
+        "file": "routes/qna.tsx",
+        "path": "qna"
+      },
+      "routes/qna/new": {
+        "id": "routes/qna/new",
+        "parentId": "root",
+        "file": "routes/qna/new.tsx",
+        "path": "qna/new"
+      },
+      "routes/qna/$questionId": {
+        "id": "routes/qna/$questionId",
+        "parentId": "root",
+        "file": "routes/qna/$questionId.tsx",
+        "path": "qna/:questionId"
+      },
+      "routes/qna/$questionId.edit": {
+        "id": "routes/qna/$questionId.edit",
+        "parentId": "root",
+        "file": "routes/qna/$questionId.edit.tsx",
+        "path": "qna/:questionId/edit"
+      },
+      "routes/qna/reply/$replyId.edit": {
+        "id": "routes/qna/reply/$replyId.edit",
+        "parentId": "root",
+        "file": "routes/qna/reply/$replyId.edit.tsx",
+        "path": "qna/reply/:replyId/edit"
+      },
+      "routes/board": {
+        "id": "routes/board",
+        "parentId": "root",
+        "file": "routes/board.tsx",
+        "path": "board"
+      },
+      "routes/board/new": {
+        "id": "routes/board/new",
+        "parentId": "root",
+        "file": "routes/board/new.tsx",
+        "path": "board/new"
+      },
+      "routes/board/$postId": {
+        "id": "routes/board/$postId",
+        "parentId": "root",
+        "file": "routes/board/$postId.tsx",
+        "path": "board/:postId"
+      },
+      "routes/board/$postId.edit": {
+        "id": "routes/board/$postId.edit",
+        "parentId": "root",
+        "file": "routes/board/$postId.edit.tsx",
+        "path": "board/:postId/edit"
+      },
+      "routes/api.search-profiles": {
+        "id": "routes/api.search-profiles",
+        "parentId": "root",
+        "file": "routes/api.search-profiles.tsx",
+        "path": "api/search-profiles"
+      },
+      "routes/issues": {
+        "id": "routes/issues",
+        "parentId": "root",
+        "file": "routes/issues.tsx",
+        "path": "issues"
+      },
+      "routes/issues.$issueId": {
+        "id": "routes/issues.$issueId",
+        "parentId": "root",
+        "file": "routes/issues.$issueId.tsx",
+        "path": "issues/:issueId"
+      },
+      "routes/volumes": {
+        "id": "routes/volumes",
+        "parentId": "root",
+        "file": "routes/volumes.tsx",
+        "path": "volumes"
+      },
+      "routes/volumes.$volumeId": {
+        "id": "routes/volumes.$volumeId",
+        "parentId": "root",
+        "file": "routes/volumes.$volumeId.tsx",
+        "path": "volumes/:volumeId"
+      },
+      "routes/admin": {
+        "id": "routes/admin",
+        "parentId": "root",
+        "file": "routes/admin.tsx",
+        "path": "admin"
+      }
+    },
+    "routeDiscovery": {
+      "mode": "lazy",
+      "manifestPath": "/__manifest"
+    },
+    "serverBuildFile": "index.js",
+    "serverModuleFormat": "esm",
+    "ssr": true,
+    "unstable_routeConfig": [
+      {
+        "id": "root",
+        "path": "",
+        "file": "root.tsx",
+        "children": [
+          {
+            "file": "routes/home.tsx",
+            "index": true
+          },
+          {
+            "file": "routes/about.tsx",
+            "path": "about"
+          },
+          {
+            "file": "routes/auth/login.tsx",
+            "path": "auth/login"
+          },
+          {
+            "file": "routes/auth/signup.tsx",
+            "path": "auth/signup"
+          },
+          {
+            "file": "routes/auth/logout.tsx",
+            "path": "auth/logout"
+          },
+          {
+            "file": "routes/auth/forgot-password.tsx",
+            "path": "auth/forgot-password"
+          },
+          {
+            "file": "routes/auth/reset-password.tsx",
+            "path": "auth/reset-password"
+          },
+          {
+            "file": "routes/auth/confirm.tsx",
+            "path": "auth/confirm"
+          },
+          {
+            "file": "routes/auth/error.tsx",
+            "path": "auth/error"
+          },
+          {
+            "file": "routes/auth/resend.tsx",
+            "path": "auth/resend"
+          },
+          {
+            "file": "routes/papers.tsx",
+            "path": "papers"
+          },
+          {
+            "file": "routes/papers/new.tsx",
+            "path": "papers/new"
+          },
+          {
+            "file": "routes/papers/$paperId.tsx",
+            "path": "papers/:paperId"
+          },
+          {
+            "file": "routes/papers/$paperId.publish.tsx",
+            "path": "papers/:paperId/publish"
+          },
+          {
+            "file": "routes/papers/$paperId.edit.tsx",
+            "path": "papers/:paperId/edit"
+          },
+          {
+            "file": "routes/papers/$paperId.new-version.tsx",
+            "path": "papers/:paperId/new-version"
+          },
+          {
+            "file": "routes/papers/$paperId.versions.$versionId.tsx",
+            "path": "papers/:paperId/versions/:versionId"
+          },
+          {
+            "file": "routes/my-papers.tsx",
+            "path": "my-papers"
+          },
+          {
+            "file": "routes/review.tsx",
+            "path": "review"
+          },
+          {
+            "file": "routes/profile/$userId.tsx",
+            "path": "profile/:userId"
+          },
+          {
+            "file": "routes/profile/$userId.edit.tsx",
+            "path": "profile/:userId/edit"
+          },
+          {
+            "file": "routes/qna.tsx",
+            "path": "qna"
+          },
+          {
+            "file": "routes/qna/new.tsx",
+            "path": "qna/new"
+          },
+          {
+            "file": "routes/qna/$questionId.tsx",
+            "path": "qna/:questionId"
+          },
+          {
+            "file": "routes/qna/$questionId.edit.tsx",
+            "path": "qna/:questionId/edit"
+          },
+          {
+            "file": "routes/qna/reply/$replyId.edit.tsx",
+            "path": "qna/reply/:replyId/edit"
+          },
+          {
+            "file": "routes/board.tsx",
+            "path": "board"
+          },
+          {
+            "file": "routes/board/new.tsx",
+            "path": "board/new"
+          },
+          {
+            "file": "routes/board/$postId.tsx",
+            "path": "board/:postId"
+          },
+          {
+            "file": "routes/board/$postId.edit.tsx",
+            "path": "board/:postId/edit"
+          },
+          {
+            "file": "routes/api.search-profiles.tsx",
+            "path": "api/search-profiles"
+          },
+          {
+            "file": "routes/issues.tsx",
+            "path": "issues"
+          },
+          {
+            "file": "routes/issues.$issueId.tsx",
+            "path": "issues/:issueId"
+          },
+          {
+            "file": "routes/volumes.tsx",
+            "path": "volumes"
+          },
+          {
+            "file": "routes/volumes.$volumeId.tsx",
+            "path": "volumes/:volumeId"
+          },
+          {
+            "file": "routes/admin.tsx",
+            "path": "admin"
+          }
+        ]
+      }
+    ]
+  },
+  "viteConfig": {
+    "build": {
+      "assetsDir": "assets"
+    }
+  }
+}

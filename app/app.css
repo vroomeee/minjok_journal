@@ -309,6 +309,24 @@ input[type="file"]::file-selector-button:hover {
   margin: var(--space-3) 0;
 }
 
+/* Global loading bar */
+.global-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 50;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-strong) 50%, var(--accent) 100%);
+  background-size: 200% 100%;
+  animation: loading-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-slide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* Nav */
 .nav {
   position: sticky;

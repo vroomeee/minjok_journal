@@ -62,6 +62,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     `
     )
     .eq("article_id", postId)
+    .eq("comment_type", "board")
     .is("parent_id", null)
     .order("created_at", { ascending: true });
 
@@ -119,10 +120,11 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { error } = await supabase.from("comments").insert({
       article_id: postId,
-      version_id: postId,
+      version_id: null,
       author_id: user.id,
       body,
       parent_id: null,
+      comment_type: "board",
     });
     if (error) return { error: "Failed to post comment" };
 

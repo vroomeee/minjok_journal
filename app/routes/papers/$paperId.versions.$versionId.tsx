@@ -179,13 +179,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     const targetVersion = versions.find((v) => v.id === versionId);
     if (!targetVersion) return { error: "Version not found" };
 
-    const { error: deleteCommentsError } = await db
-      .from("comments")
-      .delete()
-      .eq("version_id", versionId);
-    if (deleteCommentsError)
-      return { error: "Failed to delete comments for this version" };
-
     // Remove storage objects for this version (and all if deleting last)
     const targetPath = targetVersion.storage_path
       ? [targetVersion.storage_path]
@@ -195,22 +188,23 @@ export async function action({ request, params }: Route.ActionArgs) {
       .filter((p): p is string => Boolean(p));
 
     if (versions.length === 1) {
+      // Deleting the only version — delete entire paper
       if (allPaths.length > 0) {
         await supabase.storage.from("articles").remove(allPaths);
       }
-      const { error: deletePaperCommentsError } = await db
+      const { error: deleteCommentsError } = await db
         .from("comments")
         .delete()
         .eq("article_id", paperId);
-      if (deletePaperCommentsError)
-        return { error: "Version deleted but failed to delete paper comments" };
+      if (deleteCommentsError)
+        return { error: "Failed to delete paper comments" };
 
       const { error: deleteArticleError } = await db
         .from("articles")
         .delete()
         .eq("id", paperId);
       if (deleteArticleError)
-        return { error: "Version deleted but failed to delete paper" };
+        return { error: "Failed to delete paper" };
 
       const { error: deleteVersionError } = await db
         .from("article_versions")
@@ -221,13 +215,21 @@ export async function action({ request, params }: Route.ActionArgs) {
       return redirect("/papers");
     }
 
-    if (targetPath.length > 0) {
-      await supabase.storage.from("articles").remove(targetPath);
-    }
-
+    // Multiple versions — check fallback BEFORE deleting anything
     const fallbackVersion = versions.find((v) => v.id !== versionId);
     if (!fallbackVersion)
       return { error: "Could not determine fallback version" };
+
+    const { error: deleteCommentsError } = await db
+      .from("comments")
+      .delete()
+      .eq("version_id", versionId);
+    if (deleteCommentsError)
+      return { error: "Failed to delete comments for this version" };
+
+    if (targetPath.length > 0) {
+      await supabase.storage.from("articles").remove(targetPath);
+    }
 
     const { error: updateArticleError } = await db
       .from("articles")
@@ -313,6 +315,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     author_id: user.id,
     body,
     parent_id: parentId,
+    comment_type: "article",
   });
 
   if (error) return { error: "Failed to post comment" };

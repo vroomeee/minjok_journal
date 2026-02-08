@@ -99,6 +99,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       )
       .eq("article_id", paperId)
       .eq("version_id", activeVersionId)
+      .eq("comment_type", "article")
       .is("parent_id", null)
       .order("created_at", { ascending: true });
 
@@ -206,8 +207,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
-    if (paper.status === "published") {
-      return { error: "Paper is already published" };
+    // Validate allowed status transitions
+    const allowed =
+      (paper.status === "draft" && newStatus === "in_review" && isAuthor) ||
+      (paper.status === "in_review" && newStatus === "published" && isAdmin);
+
+    if (!allowed) {
+      return { error: "Invalid status transition" };
     }
 
     const { error } = await supabase
@@ -307,6 +313,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       author_id: user.id,
       body,
       parent_id: null,
+      comment_type: "article",
     });
 
     if (error) {

@@ -46,8 +46,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("status", "published");
 
   if (search) {
+    const escaped = search.replace(/[%_,]/g, "");
     query = query.or(
-      `title.ilike.%${search.replace(/,/g, "")}%,description.ilike.%${search.replace(/,/g, "")}%`
+      `title.ilike.%${escaped}%,description.ilike.%${escaped}%`
     );
   }
 

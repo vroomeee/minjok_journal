@@ -53,17 +53,18 @@ ALTER TABLE articles
   FOREIGN KEY (current_version_id)
   REFERENCES article_versions(id) ON DELETE SET NULL;
 
--- Comments table (for article reviews)
+-- Comments table (for article reviews and board post comments)
 CREATE TABLE IF NOT EXISTS comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
 
-  article_id UUID REFERENCES articles(id) ON DELETE CASCADE NOT NULL,
-  version_id UUID REFERENCES article_versions(id) ON DELETE CASCADE NOT NULL,
+  article_id UUID NOT NULL, -- References articles.id OR board_posts.id depending on comment_type
+  version_id UUID REFERENCES article_versions(id) ON DELETE CASCADE, -- NULL for board comments
   author_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   body TEXT NOT NULL,
-  parent_id UUID REFERENCES comments(id) ON DELETE CASCADE -- For threaded replies
+  parent_id UUID REFERENCES comments(id) ON DELETE CASCADE, -- For threaded replies
+  comment_type TEXT CHECK (comment_type IN ('article', 'board')) NOT NULL DEFAULT 'article'
 );
 
 -- Board posts table (admin-only posting)
@@ -106,6 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_article_versions_article ON article_versions(arti
 CREATE INDEX IF NOT EXISTS idx_comments_article ON comments(article_id);
 CREATE INDEX IF NOT EXISTS idx_comments_version ON comments(version_id);
 CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
+CREATE INDEX IF NOT EXISTS idx_comments_type ON comments(comment_type);
 CREATE INDEX IF NOT EXISTS idx_qna_questions_author ON qna_questions(author_id);
 CREATE INDEX IF NOT EXISTS idx_qna_replies_question ON qna_replies(question_id);
 

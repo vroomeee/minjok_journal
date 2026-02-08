@@ -36,6 +36,9 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!title || !file) return { error: "Title and file are required" };
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+  if (file.size > MAX_FILE_SIZE) return { error: "File too large. Maximum size is 50 MB." };
+
   // Throttle duplicate submits: block if the user created an article in the last 5 seconds.
   const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
   const { data: recentArticle } = await supabase

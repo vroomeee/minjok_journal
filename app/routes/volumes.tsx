@@ -23,6 +23,7 @@ type VolumeRecord = {
   status: "draft" | "released";
   created_at: string;
   release_date: string | null;
+  cover_url?: string | null;
 };
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -55,8 +56,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     countQuery = countQuery.not("id", "in", `(${excludedList})`);
   }
 
-  const { count: availableCount, error: issuesError } = await countQuery;
-
   let dataQuery = supabase
     .from("issues")
     .select(
@@ -70,15 +69,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         articles:issue_articles(
           article:articles(
             id,
-            title,
-            authors:article_authors(
-              profile_id,
-              profile:profiles!article_authors_profile_id_fkey(
-                id,
-                full_name,
-                role_type
-              )
-            )
+            title
           )
         ),
         volume_issues:volume_issues!left(issue_id)(
@@ -92,20 +83,25 @@ export async function loader({ request }: Route.LoaderArgs) {
     dataQuery = dataQuery.not("id", "in", `(${excludedList})`);
   }
 
-  const { data: releasedIssues = [] } = await dataQuery
-    .order("release_date", { ascending: false })
-    .range(
-      (availablePage - 1) * availablePerPage,
-      availablePage * availablePerPage - 1
-    );
-
-  const {
-    data: volumes = [],
-    error: volumesError,
-  } = await supabase
-    .from("volumes")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const [
+    { count: availableCount, error: issuesError },
+    { data: releasedIssues = [] },
+    { data: volumes = [], error: volumesError },
+  ] = await Promise.all([
+    countQuery,
+    dataQuery
+      .order("release_date", { ascending: false })
+      .range(
+        (availablePage - 1) * availablePerPage,
+        availablePage * availablePerPage - 1
+      ),
+    supabase
+      .from("volumes")
+      .select(
+        "id,title,description,status,created_at,release_date,cover_url"
+      )
+      .order("created_at", { ascending: false }),
+  ]);
 
   let volumeIssues: {
     volume_id: string;

@@ -27,38 +27,38 @@ export function Nav({ user, profile }: NavProps) {
     <nav className="nav">
       <div className="nav-inner">
         <div className="nav-links" style={{ gap: 16 }}>
-          <Link to="/" className="nav-logo">
+          <Link to="/" className="nav-logo" prefetch="intent">
             Minjok Journal
           </Link>
           <div className="nav-links">
-            <Link to="/papers" className="nav-link">
+            <Link to="/papers" className="nav-link" prefetch="intent">
               Papers
             </Link>
-            <Link to="/issues" className="nav-link">
+            <Link to="/issues" className="nav-link" prefetch="intent">
               Issues
             </Link>
-            <Link to="/volumes" className="nav-link">
+            <Link to="/volumes" className="nav-link" prefetch="intent">
               Volumes
             </Link>
             {profile &&
               (profile.role_type === "mentor" ||
                 profile.role_type === "prof" ||
                 profile.role_type === "admin") && (
-                <Link to="/review" className="nav-link">
+                <Link to="/review" className="nav-link" prefetch="intent">
                   Review Queue
                 </Link>
               )}
-            <Link to="/qna" className="nav-link">
+            <Link to="/qna" className="nav-link" prefetch="intent">
               Q&A
             </Link>
-            <Link to="/board" className="nav-link">
+            <Link to="/board" className="nav-link" prefetch="intent">
               Board
             </Link>
-            <Link to="/about" className="nav-link">
+            <Link to="/about" className="nav-link" prefetch="intent">
               About
             </Link>
             {isAdmin && (
-              <Link to="/admin" className="nav-link">
+              <Link to="/admin" className="nav-link" prefetch="intent">
                 Admin
               </Link>
             )}
@@ -68,10 +68,10 @@ export function Nav({ user, profile }: NavProps) {
         <div className="nav-links" style={{ gap: 10 }}>
           {resolvedUser && resolvedProfile ? (
             <>
-              <Link to="/my-papers" className="nav-link">
+              <Link to="/my-papers" className="nav-link" prefetch="intent">
                 My Papers
               </Link>
-              <Link to={`/profile/${resolvedUser.id}`} className="nav-link">
+              <Link to={`/profile/${resolvedUser.id}`} className="nav-link" prefetch="intent">
                 <span className="pill">
                   {resolvedProfile.email || resolvedUser.email}
                 </span>
@@ -88,12 +88,13 @@ export function Nav({ user, profile }: NavProps) {
             </>
           ) : (
             <>
-              <Link to="/auth/login" className="nav-link">
+              <Link to="/auth/login" className="nav-link" prefetch="intent">
                 Login
               </Link>
               <Link
                 to="/auth/signup"
                 className="btn btn-accent"
+                prefetch="intent"
                 style={{ padding: "6px 12px" }}
               >
                 Sign Up

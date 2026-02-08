@@ -47,7 +47,7 @@ const userProfileCache: Map<
     promise: Promise<{ user: User | null; profile: Database["public"]["Tables"]["profiles"]["Row"] | null }>;
   }
 > = new Map();
-const CACHE_WINDOW_MS = 5000;
+const CACHE_WINDOW_MS = 30000;
 
 // Fetch user and profile once per request; subsequent calls reuse the same promise.
 export async function getUserAndProfile(request: Request) {

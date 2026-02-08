@@ -45,6 +45,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: "Password is required" }, { status: 400, headers });
   }
 
+  if (password.length < 8) {
+    return Response.json({ error: "Password must be at least 8 characters" }, { status: 400, headers });
+  }
+
   if (password !== repeatPassword) {
     return Response.json({ error: "Passwords do not match" }, { status: 400, headers });
   }
