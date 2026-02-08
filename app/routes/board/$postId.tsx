@@ -196,9 +196,7 @@ export default function BoardPost() {
   const commentFetcher = useFetcher<typeof action>();
   const commentFormRef = useRef<HTMLFormElement>(null);
   const editCommentFormsRef = useRef<HTMLFormElement[]>([]);
-  const prevCommentState = useRef<"idle" | "loading" | "submitting">(
-    commentFetcher.state
-  );
+  const needsResetRef = useRef(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const rowsForBody = (body: string) =>
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
@@ -219,7 +217,7 @@ export default function BoardPost() {
 
   useEffect(() => {
     if (
-      prevCommentState.current === "submitting" &&
+      needsResetRef.current &&
       commentFetcher.state === "idle" &&
       commentFetcher.data?.success
     ) {
@@ -227,8 +225,8 @@ export default function BoardPost() {
       editCommentFormsRef.current.forEach((form) => form?.reset());
       setEditingCommentId(null);
       revalidator.revalidate();
+      needsResetRef.current = false;
     }
-    prevCommentState.current = commentFetcher.state;
   }, [commentFetcher.state, commentFetcher.data, revalidator]);
 
   return (
@@ -316,9 +314,9 @@ export default function BoardPost() {
               className="list"
               ref={commentFormRef}
               style={{ marginBottom: 12 }}
-              onSubmit={(e) => {
-                prevCommentState.current = "submitting";
-              }}
+            onSubmit={() => {
+              needsResetRef.current = true;
+            }}
             >
               <input type="hidden" name="intent" value="comment" />
               <textarea
@@ -417,10 +415,10 @@ export default function BoardPost() {
                         editCommentFormsRef.current.push(form);
                       }
                     }}
-                    onSubmit={() => {
-                      prevCommentState.current = "submitting";
-                      setEditingCommentId(null);
-                    }}
+                  onSubmit={() => {
+                    needsResetRef.current = true;
+                    setEditingCommentId(null);
+                  }}
                   >
                     <input type="hidden" name="intent" value="editComment" />
                     <input type="hidden" name="commentId" value={comment.id} />
