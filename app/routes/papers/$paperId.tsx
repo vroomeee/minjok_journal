@@ -332,7 +332,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     });
 
     if (error) {
-      return { error: "Failed to post comment" };
+      return { error: "Failed to post comment: " + (error.message ?? "unknown error") };
     }
 
     return { success: true };
@@ -371,7 +371,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       .from("comments")
       .update({ body })
       .eq("id", commentId);
-    if (error) return { error: "Failed to update comment" };
+    if (error)
+      return { error: "Failed to update comment: " + (error.message ?? "unknown error") };
     return { success: true };
   }
 
@@ -692,6 +693,16 @@ export default function PaperDetail() {
               <p className="muted" style={{ marginBottom: 12 }}>
                 Please log in to leave a comment.
               </p>
+            )}
+            {commentFetcher.data?.error && (
+              <div
+                className="section-compact subtle"
+                style={{ marginTop: 8 }}
+              >
+                <p className="text-sm" style={{ color: "#f6b8bd", margin: 0 }}>
+                  {commentFetcher.data.error}
+                </p>
+              </div>
             )}
 
             <div className="card-grid">
