@@ -1,5 +1,7 @@
+import { isAppRole, type AppRole } from "~/lib/roles";
+
 interface RoleBadgeProps {
-  role: "mentor" | "mentee" | "admin" | "prof";
+  role: string | null | undefined;
   className?: string;
 }
 
@@ -23,7 +25,8 @@ const ROLE_CONFIG = {
 } as const;
 
 export function RoleBadge({ role, className = "" }: RoleBadgeProps) {
-  const config = ROLE_CONFIG[role];
+  const resolvedRole: AppRole = isAppRole(role) ? role : "mentee";
+  const config = ROLE_CONFIG[resolvedRole];
 
   return (
     <span

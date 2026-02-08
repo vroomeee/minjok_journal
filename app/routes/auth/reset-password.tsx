@@ -42,7 +42,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ResetPassword() {
-  const fetcher = useFetcher<typeof action>();
+  const fetcher = useFetcher<{ error?: string }>();
   const error = fetcher.data?.error;
   const loading = fetcher.state === "submitting";
 

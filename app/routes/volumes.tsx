@@ -1,8 +1,9 @@
-import { Form, Link, useActionData, useLoaderData, useRouteLoaderData } from "react-router";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
 import type { Route } from "./+types/volumes";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { useState } from "react";
+import { useRootLoaderData } from "~/lib/root-data";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -20,10 +21,38 @@ type VolumeRecord = {
   id: string;
   title: string;
   description: string | null;
-  status: "draft" | "released";
-  created_at: string;
+  status: string | null;
+  created_at: string | null;
   release_date: string | null;
   cover_url?: string | null;
+};
+
+type VolumeIssueJoin = {
+  volume_id: string;
+  position: number | null;
+  issue: {
+    id: string;
+    title: string;
+    release_date: string | null;
+    status: string | null;
+  } | null;
+};
+
+type IssueArticleLink = {
+  article: {
+    id: string;
+    title: string;
+  } | null;
+};
+
+type ReleasedIssueRecord = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string | null;
+  release_date: string | null;
+  created_at: string | null;
+  articles?: IssueArticleLink[] | null;
 };
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -33,7 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const availablePerPage = 50;
 
   // Fire independent queries in parallel: attached IDs (for exclusion) + volumes list
-  const [{ data: attachedVolumeIssueRows = [] }, { data: volumes = [], error: volumesError }] =
+  const [{ data: attachedVolumeIssueRows }, { data: volumes, error: volumesError }] =
     await Promise.all([
       supabase.from("volume_issues").select("issue_id"),
       supabase
@@ -41,9 +70,11 @@ export async function loader({ request }: Route.LoaderArgs) {
         .select("id,title,description,status,created_at,release_date,cover_url")
         .order("created_at", { ascending: false }),
     ]);
+  const safeAttachedVolumeIssueRows = attachedVolumeIssueRows ?? [];
+  const safeVolumes = volumes ?? [];
 
   const attachedIssueIds = new Set(
-    attachedVolumeIssueRows.map((row) => row.issue_id).filter(Boolean)
+    safeAttachedVolumeIssueRows.map((row) => row.issue_id).filter(Boolean)
   );
 
   const excludedList =
@@ -90,11 +121,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   // Now run the dependent queries in parallel: available issues + volume_issues for volumes
-  const volumeIds = (volumes || []).map((v) => v.id);
+  const volumeIds = safeVolumes.map((v) => v.id);
+  const emptyVolumeIssuesResult: { data: VolumeIssueJoin[] } = { data: [] };
 
   const [
     { count: availableCount, error: issuesError },
-    { data: releasedIssues = [] },
+    { data: releasedIssues },
     volumeIssuesResult,
   ] = await Promise.all([
     countQuery,
@@ -121,12 +153,13 @@ export async function loader({ request }: Route.LoaderArgs) {
           )
           .in("volume_id", volumeIds)
           .order("position", { ascending: true })
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve(emptyVolumeIssuesResult),
   ]);
 
-  const volumeIssues = volumeIssuesResult.data || [];
+  const volumeIssues = (volumeIssuesResult.data ?? []) as VolumeIssueJoin[];
+  const safeReleasedIssues = (releasedIssues ?? []) as unknown as ReleasedIssueRecord[];
 
-  const volumesWithIssues = (volumes || []).map((volume: VolumeRecord) => ({
+  const volumesWithIssues = safeVolumes.map((volume: VolumeRecord) => ({
     ...volume,
     formattedDate: formatDate(volume.release_date ?? volume.created_at),
     issues: volumeIssues
@@ -135,7 +168,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       .filter(Boolean),
   }));
 
-  const formattedReleasedIssues = (releasedIssues || []).map((issue) => ({
+  const formattedReleasedIssues = safeReleasedIssues.map((issue) => ({
     ...issue,
     formattedReleaseDate: formatDate(issue.release_date),
   }));
@@ -191,7 +224,7 @@ export async function action({ request }: Route.ActionArgs) {
     const coverFile = formData.get("cover") as File | null;
     const issueIds = formData
       .getAll("issueIds")
-      .map((id) => (id ? String(id) : ""))
+      .map((id: FormDataEntryValue) => (id ? String(id) : ""))
       .filter(Boolean);
 
     if (!title) return { error: "Title is required." };
@@ -214,7 +247,7 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "Failed to create volume." };
     }
 
-    const mappings = issueIds.map((issueId, idx) => ({
+    const mappings = issueIds.map((issueId: string, idx: number) => ({
       volume_id: volume.id,
       issue_id: issueId,
       position: idx,
@@ -254,9 +287,7 @@ export default function VolumesPage() {
     availableTotalPages,
     schemaMissing,
   } = useLoaderData<typeof loader>();
-  const rootData = useRouteLoaderData("root") as
-    | { user?: { id: string }; profile?: { role_type?: string | null } }
-    | null;
+  const rootData = useRootLoaderData();
   const user = rootData?.user;
   const profile = rootData?.profile;
   const isAdmin = profile?.role_type === "admin";
@@ -414,8 +445,8 @@ export default function VolumesPage() {
                             <span className="muted text-sm">{issue.description}</span>
                           )}
                           <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-                            {(issue.articles || []).slice(0, 3).map((entry: any) => (
-                              <span key={entry.article?.id || Math.random()} className="pill subtle">
+                            {(issue.articles || []).slice(0, 3).map((entry, index) => (
+                              <span key={entry.article?.id || `${issue.id}-${index}`} className="pill subtle">
                                 {entry.article?.title || "Untitled"}
                               </span>
                             ))}

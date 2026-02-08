@@ -33,11 +33,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("id", user.id)
     .single();
 
+  // Product rule: publishing is restricted to admins.
   const isAdmin = profile?.role_type === "admin";
-  const isAuthor =
-    paper.author_id === user.id ||
-    paper.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
-  if (!isAuthor && !isAdmin) {
+  if (!isAdmin) {
     throw new Response("Unauthorized", { status: 403 });
   }
 
@@ -72,11 +70,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     .select("role_type")
     .eq("id", user.id)
     .single();
+  // Keep action-level auth check to prevent direct POST bypasses.
   const isAdmin = profile?.role_type === "admin";
-  const isAuthor =
-    paper.author_id === user.id ||
-    paper.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
-  if (!isAuthor && !isAdmin) {
+  if (!isAdmin) {
     throw new Response("Unauthorized", { status: 403 });
   }
 

@@ -1,23 +1,14 @@
-import { Link, Form, useRouteLoaderData } from "react-router";
+import { Link, Form } from "react-router";
+import type { RootProfile, RootUser } from "~/lib/root-data";
+import { useRootLoaderData } from "~/lib/root-data";
 
 interface NavProps {
-  user?: {
-    id: string;
-    email?: string;
-  };
-  profile?: {
-    email: string | null;
-    role_type: "mentor" | "mentee" | "admin" | "prof";
-  };
+  user?: RootUser;
+  profile?: RootProfile;
 }
 
 export function Nav({ user, profile }: NavProps) {
-  const rootData = useRouteLoaderData("root") as
-    | {
-        user?: { id: string; email?: string };
-        profile?: { email: string | null; role_type: any };
-      }
-    | undefined;
+  const rootData = useRootLoaderData();
   const resolvedUser = user ?? rootData?.user;
   const resolvedProfile = profile ?? rootData?.profile;
 

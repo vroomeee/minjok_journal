@@ -23,7 +23,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     .maybeSingle();
   if (!existingProfile) {
     return Response.json(
-      { error: "We couldn’t find an account with that email. Try signing up instead." },
+      { error: "We could not find an account with that email. Try signing up instead." },
       { status: 400, headers }
     );
   }
@@ -50,7 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function ResendConfirmationEmail() {
-  const fetcher = useFetcher<typeof action>();
+  const fetcher = useFetcher<{ error?: string; resent?: boolean }>();
   const loading = fetcher.state === "submitting";
   const error = fetcher.data?.error;
   const resent = fetcher.data?.resent;
@@ -109,3 +109,4 @@ export default function ResendConfirmationEmail() {
     </div>
   );
 }
+

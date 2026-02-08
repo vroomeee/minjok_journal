@@ -7,7 +7,7 @@ type Author = {
     id?: string;
     full_name?: string | null;
     email?: string | null;
-    role_type?: "mentor" | "mentee" | "admin" | "prof";
+    role_type?: string | null;
   } | null;
 };
 
@@ -30,9 +30,10 @@ export function AuthorList({
           {showBadges && a.profile?.role_type && (
             <RoleBadge role={a.profile.role_type} className="text-xs py-0 px-1" />
           )}
-          {idx < authors.length - 1 && <span className="muted">•</span>}
+          {idx < authors.length - 1 && <span className="muted">|</span>}
         </div>
       ))}
     </div>
   );
 }
+

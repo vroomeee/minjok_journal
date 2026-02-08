@@ -32,7 +32,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ForgotPassword() {
-  const fetcher = useFetcher<typeof action>();
+  const fetcher = useFetcher<{ error?: string }>();
   const [searchParams] = useSearchParams();
 
   const success = searchParams.has("success");

@@ -1,10 +1,8 @@
-import { useRouteLoaderData } from "react-router";
 import { Nav } from "~/components/nav";
+import { useRootLoaderData } from "~/lib/root-data";
 
 export default function About() {
-  const rootData = useRouteLoaderData("root") as
-    | { user?: { id: string; email?: string }; profile?: { role_type: "mentor" | "mentee" | "admin" | "prof"; email: string | null } }
-    | null;
+  const rootData = useRootLoaderData();
   const user = rootData?.user;
   const profile = rootData?.profile;
 

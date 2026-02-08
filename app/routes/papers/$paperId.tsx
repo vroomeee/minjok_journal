@@ -31,6 +31,19 @@ function formatDate(dateStr: string | null): string {
   return dateFmt.format(new Date(dateStr));
 }
 
+type PaperComment = {
+  id: string;
+  author_id: string;
+  body: string;
+  created_at: string | null;
+  author?: {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    role_type: string | null;
+  } | null;
+};
+
 // Server-side loader to fetch paper details
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -65,7 +78,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         storage_path,
         notes
       )
-    `
+    `,
     )
     .eq("id", paperId)
     .single();
@@ -82,7 +95,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const activeVersionId =
     paper.current_version_id || paper.versions?.[0]?.id || null;
 
-  let comments: any[] = [];
+  let comments: PaperComment[] = [];
   if (activeVersionId) {
     const { data: commentsData } = await supabase
       .from("comments")
@@ -95,7 +108,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
           full_name,
           role_type
         )
-      `
+      `,
       )
       .eq("article_id", paperId)
       .eq("version_id", activeVersionId)
@@ -158,7 +171,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       .single();
     const isAuthor =
       paper?.author_id === user.id ||
-      paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+      paper?.authors?.some(
+        (a: { profile_id: string }) => a.profile_id === user.id,
+      );
     const isAdmin = profile.role_type === "admin";
     return { user, profile, paper, isAuthor, isAdmin };
   };
@@ -283,7 +298,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       .from("articles")
       .select(
         `status, current_version_id,
-         versions:article_versions!article_versions_article_id_fkey (id, version_number)`
+         versions:article_versions!article_versions_article_id_fkey (id, version_number)`,
       )
       .eq("id", paperId)
       .single();
@@ -371,9 +386,10 @@ export default function PaperDetail() {
     publishedVersion,
     publishedFileUrl,
   } = useLoaderData<typeof loader>();
-  const rootData = useRouteLoaderData("root") as
-    | { user?: { id: string }; profile?: { role_type?: string | null } }
-    | null;
+  const rootData = useRouteLoaderData("root") as {
+    user?: { id: string };
+    profile?: { role_type?: string | null };
+  } | null;
   const user = rootData?.user;
   const profile = rootData?.profile;
   const actionData = useActionData<typeof action>();
@@ -399,13 +415,15 @@ export default function PaperDetail() {
   }, [commentFetcher.state, commentFetcher.data, revalidator]);
 
   const [showVersions, setShowVersions] = useState(
-    paper.status !== "published"
+    paper.status !== "published",
   );
 
-  const isAuthor = paper.authors?.some((a: any) => a.profile_id === user?.id);
+  const isAuthor = paper.authors?.some(
+    (a: { profile_id: string }) => a.profile_id === user?.id,
+  );
   const isAdmin = profile?.role_type === "admin";
   const canDelete = isAuthor || isAdmin;
-  const canPublish = isAuthor || isAdmin;
+  const canPublish = isAdmin;
   const canUploadNewVersion = isAuthor && paper.status !== "published";
   const canSubmitForReview = isAuthor && paper.status === "draft";
   const showComments = paper.status === "published" && !!activeVersionId;
@@ -454,9 +472,7 @@ export default function PaperDetail() {
             style={{ flexWrap: "wrap", gap: 12, marginBottom: 8 }}
           >
             <AuthorList authors={paper.authors} showBadges />
-            <span className="meta">
-              {paper.formattedDate}
-            </span>
+            <span className="meta">{paper.formattedDate}</span>
           </div>
           {paper.description && (
             <p className="muted" style={{ marginBottom: 12 }}>
@@ -698,9 +714,7 @@ export default function PaperDetail() {
                         className="text-xs py-0 px-1"
                       />
                     )}
-                    <span className="meta">
-                      {comment.formattedDate}
-                    </span>
+                    <span className="meta">{comment.formattedDate}</span>
                     {(user?.id === comment.author_id ||
                       profile?.role_type === "admin") && (
                       <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>

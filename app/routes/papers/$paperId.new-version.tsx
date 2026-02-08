@@ -1,6 +1,7 @@
 import { Form, redirect, useActionData, useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/$paperId.new-version";
 import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
+import { isEnglishFileName } from "~/lib/file-names";
 import { Nav } from "~/components/nav";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -52,6 +53,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   const file = formData.get("file") as File;
 
   if (!file) return { error: "File is required" };
+  if (!isEnglishFileName(file.name)) {
+    return {
+      error:
+        "File name must only use English letters, numbers, dots, hyphens, or underscores.",
+    };
+  }
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
   if (file.size > MAX_FILE_SIZE) return { error: "File too large. Maximum size is 50 MB." };

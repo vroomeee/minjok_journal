@@ -31,6 +31,20 @@ function formatDate(dateStr: string | null): string {
   return dateFmt.format(new Date(dateStr));
 }
 
+type VersionComment = {
+  id: string;
+  parent_id: string | null;
+  author_id: string;
+  body: string;
+  created_at: string | null;
+  author?: {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    role_type: string | null;
+  } | null;
+};
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { paperId, versionId } = params;
@@ -87,7 +101,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .order("created_at", { ascending: true });
 
   const commentIds = comments?.map((c) => c.id) || [];
-  let replies: any[] = [];
+  let replies: VersionComment[] = [];
   if (commentIds.length > 0) {
     const { data: repliesData } = await supabase
       .from("comments")
@@ -498,7 +512,7 @@ export default function VersionReview() {
                 if (form && !commentFormsRef.current.includes(form)) {
                   commentFormsRef.current.push(form);
                 }
-                formRef.current = form || undefined;
+                formRef.current = form || null;
               }}
               className="list"
               style={{ marginBottom: 12 }}

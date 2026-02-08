@@ -2,12 +2,32 @@ import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@s
 import { createClient as createSupabaseClient, type User } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
-// Server-side Supabase client creation
-// This is the canonical place for creating Supabase clients
+type SupabaseServerClient = ReturnType<typeof createServerClient<Database>>;
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type UserProfileResult = { user: User | null; profile: ProfileRow | null };
+
+type SupabaseRequestCache = {
+  supabase?: SupabaseServerClient;
+  headers?: Headers;
+  userProfilePromise?: Promise<UserProfileResult>;
+};
+
+type RequestWithSupabaseCache = Request & {
+  __supabaseCache?: SupabaseRequestCache;
+};
+
+function withSupabaseCache(request: Request) {
+  return request as RequestWithSupabaseCache;
+}
+
+// Canonical place for creating a request-scoped Supabase client.
 export function createSupabaseServerClient(request: Request) {
-  const reqAny = request as any;
-  if (reqAny.__supabaseCache?.supabase && reqAny.__supabaseCache.headers) {
-    return reqAny.__supabaseCache as { supabase: ReturnType<typeof createServerClient<Database>>; headers: Headers };
+  const requestWithCache = withSupabaseCache(request);
+  if (requestWithCache.__supabaseCache?.supabase && requestWithCache.__supabaseCache.headers) {
+    return {
+      supabase: requestWithCache.__supabaseCache.supabase,
+      headers: requestWithCache.__supabaseCache.headers,
+    };
   }
 
   const headers = new Headers();
@@ -35,7 +55,7 @@ export function createSupabaseServerClient(request: Request) {
     }
   );
 
-  reqAny.__supabaseCache = { supabase, headers };
+  requestWithCache.__supabaseCache = { supabase, headers };
 
   return { supabase, headers };
 }
@@ -44,22 +64,19 @@ const userProfileCache: Map<
   string,
   {
     ts: number;
-    promise: Promise<{ user: User | null; profile: Database["public"]["Tables"]["profiles"]["Row"] | null }>;
+    promise: Promise<UserProfileResult>;
   }
 > = new Map();
 const CACHE_WINDOW_MS = 30000;
 
 // Fetch user and profile once per request; subsequent calls reuse the same promise.
 export async function getUserAndProfile(request: Request) {
-  const reqAny = request as any;
-  if (!reqAny.__supabaseCache) {
-    reqAny.__supabaseCache = {};
+  const requestWithCache = withSupabaseCache(request);
+  if (!requestWithCache.__supabaseCache) {
+    requestWithCache.__supabaseCache = {};
   }
-  if (reqAny.__supabaseCache.userProfilePromise) {
-    return reqAny.__supabaseCache.userProfilePromise as Promise<{
-      user: User | null;
-      profile: Database["public"]["Tables"]["profiles"]["Row"] | null;
-    }>;
+  if (requestWithCache.__supabaseCache.userProfilePromise) {
+    return requestWithCache.__supabaseCache.userProfilePromise;
   }
 
   const { supabase } = createSupabaseServerClient(request);
@@ -67,16 +84,16 @@ export async function getUserAndProfile(request: Request) {
   const now = Date.now();
   const cached = userProfileCache.get(cookieKey);
   if (cached && now - cached.ts < CACHE_WINDOW_MS) {
-    reqAny.__supabaseCache.userProfilePromise = cached.promise;
+    requestWithCache.__supabaseCache.userProfilePromise = cached.promise;
     return cached.promise;
   }
 
   const userProfilePromise = (async () => {
     // Skip auth check if no Supabase auth cookies exist (avoids unnecessary refresh attempts)
     const cookies = parseCookieHeader(request.headers.get("Cookie") ?? "");
-    const hasAuthCookies = cookies.some(c =>
-      c.name.includes('auth-token') ||
-      c.name.includes('sb-') // Supabase cookie prefix
+    const hasAuthCookies = cookies.some((c) =>
+      c.name.includes("auth-token") ||
+      c.name.includes("sb-") // Supabase cookie prefix
     );
 
     if (!hasAuthCookies) {
@@ -96,7 +113,7 @@ export async function getUserAndProfile(request: Request) {
       ) {
         // Clear invalid auth cookies to prevent repeated refresh token errors
         try {
-          await supabase.auth.signOut({ scope: 'local' });
+          await supabase.auth.signOut({ scope: "local" });
         } catch {
           // Ignore signOut errors - cookies may already be invalid
         }
@@ -122,7 +139,7 @@ export async function getUserAndProfile(request: Request) {
     return { user, profile };
   })();
 
-  reqAny.__supabaseCache.userProfilePromise = userProfilePromise;
+  requestWithCache.__supabaseCache.userProfilePromise = userProfilePromise;
   userProfileCache.set(cookieKey, { ts: now, promise: userProfilePromise });
   return userProfilePromise;
 }

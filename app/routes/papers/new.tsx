@@ -8,6 +8,7 @@ import {
 } from "react-router";
 import type { Route } from "./+types/new";
 import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
+import { isEnglishFileName } from "~/lib/file-names";
 import { Nav } from "~/components/nav";
 import { useEffect, useMemo, useState } from "react";
 
@@ -35,6 +36,12 @@ export async function action({ request }: Route.ActionArgs) {
   const coauthorIds = formData.getAll("coauthorIds").map(String);
 
   if (!title || !file) return { error: "Title and file are required" };
+  if (!isEnglishFileName(file.name)) {
+    return {
+      error:
+        "File name must only use English letters, numbers, dots, hyphens, or underscores.",
+    };
+  }
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
   if (file.size > MAX_FILE_SIZE) return { error: "File too large. Maximum size is 50 MB." };

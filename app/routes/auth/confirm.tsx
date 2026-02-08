@@ -63,7 +63,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function ConfirmPage() {
-  const data = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>() as
+    | { next?: string; error?: string }
+    | null;
   const navigate = useNavigate();
   const [status, setStatus] = useState<"loading" | "error">(data?.error ? "error" : "loading");
   const [message, setMessage] = useState<string | null>(data?.error ?? null);
@@ -121,7 +123,7 @@ export default function ConfirmPage() {
     <div className="page">
       <div className="page-body" style={{ maxWidth: 520 }}>
         <div className="section">
-          <h1 style={{ fontSize: 20, marginBottom: 8 }}>Confirming your account…</h1>
+          <h1 style={{ fontSize: 20, marginBottom: 8 }}>Confirming your account...</h1>
           {status === "loading" && (
             <p className="muted">Finalizing confirmation. Please wait a moment.</p>
           )}
@@ -135,3 +137,4 @@ export default function ConfirmPage() {
     </div>
   );
 }
+

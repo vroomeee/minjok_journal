@@ -22,7 +22,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Login() {
-  const fetcher = useFetcher<typeof action>();
+  const fetcher = useFetcher<{ error?: string }>();
   const [searchParams] = useSearchParams();
   const error = fetcher.data?.error;
   const loading = fetcher.state === "submitting";

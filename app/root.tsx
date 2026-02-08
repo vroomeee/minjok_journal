@@ -10,6 +10,7 @@ import {
 import type { Route } from "./+types/root";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
 import stylesheet from "./app.css?url";
+import type { RootLoaderData } from "./lib/root-data";
 import {
   createSupabaseServerClient,
   getUserAndProfile,
@@ -75,12 +76,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function Root() {
-  const data = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>() as RootLoaderData;
   const navigation = useNavigation();
   const isLoading = navigation.state === "loading";
 
   return (
     <>
+      {/* Keep route transitions visibly responsive while loaders resolve. */}
       {isLoading && <div className="global-loading-bar" />}
       <Outlet />
       <script

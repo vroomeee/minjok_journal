@@ -13,6 +13,7 @@ import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef, useState } from "react";
 import { UserLink } from "~/components/user-link";
+import type { Database } from "~/lib/database.types";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -25,6 +26,8 @@ function formatDate(dateStr: string | null): string {
   if (!dateStr) return "n/a";
   return dateFmt.format(new Date(dateStr));
 }
+
+type CommentInsert = Database["public"]["Tables"]["comments"]["Insert"];
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
@@ -86,6 +89,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
   const { postId } = params;
+  if (!postId) {
+    throw new Response("Post not found", { status: 404 });
+  }
 
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
@@ -122,14 +128,16 @@ export async function action({ request, params }: Route.ActionArgs) {
     const body = formData.get("body") as string;
     if (!body) return { error: "Comment is required" };
 
-    const { error } = await supabase.from("comments").insert({
+    const payload = {
       article_id: postId,
       version_id: null,
       author_id: user.id,
       body,
       parent_id: null,
       comment_type: "board",
-    });
+    } as unknown as CommentInsert;
+
+    const { error } = await supabase.from("comments").insert(payload);
     if (error) return { error: "Failed to post comment" };
 
     return { success: true };
@@ -225,7 +233,7 @@ export default function BoardPost() {
         <div className="section">
           <div className="row" style={{ gap: 8, marginBottom: 8 }}>
             <Link to="/board" className="nav-link" style={{ padding: 0 }}>
-              ← Back to Board
+              {"<- Back to Board"}
             </Link>
           </div>
           <div
@@ -454,3 +462,4 @@ export default function BoardPost() {
     </div>
   );
 }
+

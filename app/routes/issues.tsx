@@ -3,15 +3,14 @@ import {
   Link,
   useActionData,
   useLoaderData,
-  useRouteLoaderData,
 } from "react-router";
 import type { Route } from "./+types/issues";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
-import { UserLink } from "~/components/user-link";
 import { RoleBadge } from "~/components/role-badge";
 import { useState } from "react";
 import { AuthorList } from "~/components/author-list";
+import { useRootLoaderData } from "~/lib/root-data";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -29,9 +28,41 @@ type IssueRecord = {
   id: string;
   title: string;
   description: string | null;
-  status: "draft" | "released";
-  created_at: string;
+  status: string | null;
+  created_at: string | null;
   release_date: string | null;
+  cover_url: string | null;
+};
+
+type PaperAuthor = {
+  profile_id?: string;
+  profile?: {
+    id: string;
+    full_name: string | null;
+    role_type: string | null;
+    email?: string | null;
+  } | null;
+};
+
+type AvailablePaper = {
+  id: string;
+  title: string;
+  description: string | null;
+  created_at: string | null;
+  authors?: PaperAuthor[] | null;
+};
+
+type IssueArticle = {
+  id: string;
+  title: string;
+  created_at: string | null;
+  authors?: PaperAuthor[] | null;
+};
+
+type IssueArticleJoin = {
+  issue_id: string;
+  position: number | null;
+  article: IssueArticle | null;
 };
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -43,12 +74,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
   const availablePerPage = 50;
 
-  const { data: attachedArticleRows = [] } = await supabase
+  const { data: attachedArticleRows } = await supabase
     .from("issue_articles")
     .select("article_id");
+  const safeAttachedArticleRows = attachedArticleRows ?? [];
 
   const attachedArticleIds = new Set(
-    attachedArticleRows.map((row) => row.article_id).filter(Boolean),
+    safeAttachedArticleRows.map((row) => row.article_id).filter(Boolean),
   );
 
   const excludedList =
@@ -96,36 +128,25 @@ export async function loader({ request }: Route.LoaderArgs) {
     dataQuery = dataQuery.not("id", "in", `(${excludedList})`);
   }
 
-  const { data: availablePapers = [] } = await dataQuery
+  const { data: availablePapersRaw } = await dataQuery
     .order("created_at", { ascending: false })
     .range(
       (availablePage - 1) * availablePerPage,
       availablePage * availablePerPage - 1,
     );
+  const availablePapers = (availablePapersRaw ?? []) as unknown as AvailablePaper[];
 
-  const { data: issues = [], error: issuesError } = await supabase
+  const { data: issuesRaw, error: issuesError } = await supabase
     .from("issues")
     .select("*")
     .order("created_at", { ascending: false });
+  const issues = (issuesRaw ?? []) as unknown as IssueRecord[];
 
-  let issueArticles: {
-    issue_id: string;
-    position: number | null;
-    article: {
-      id: string;
-      title: string;
-      created_at: string;
-      author?: {
-        id: string;
-        full_name: string | null;
-        role_type: string | null;
-      };
-    } | null;
-  }[] = [];
+  let issueArticles: IssueArticleJoin[] = [];
 
-  const issueIds = (issues || []).map((i) => i.id);
+  const issueIds = issues.map((i) => i.id);
   if (issueIds.length) {
-    const { data } = await supabase
+    const { data: issueArticlesRaw } = await supabase
       .from("issue_articles")
       .select(
         `
@@ -149,21 +170,19 @@ export async function loader({ request }: Route.LoaderArgs) {
       .in("issue_id", issueIds)
       .order("position", { ascending: true });
 
-    if (data) {
-      issueArticles = data;
-    }
+    issueArticles = (issueArticlesRaw ?? []) as unknown as IssueArticleJoin[];
   }
 
-  const issuesWithArticles = (issues || []).map((issue: IssueRecord) => ({
+  const issuesWithArticles = issues.map((issue) => ({
     ...issue,
     formattedDate: formatDate(issue.release_date ?? issue.created_at),
     articles: issueArticles
       .filter((ia) => ia.issue_id === issue.id)
       .map((ia) => ia.article)
-      .filter(Boolean),
+      .filter((article): article is IssueArticle => Boolean(article)),
   }));
 
-  const formattedPapers = (availablePapers || []).map((paper) => ({
+  const formattedPapers = availablePapers.map((paper) => ({
     ...paper,
     formattedDate: formatDate(paper.created_at),
   }));
@@ -222,7 +241,7 @@ export async function action({ request }: Route.ActionArgs) {
     const coverFile = formData.get("cover") as File | null;
     const articleIds = formData
       .getAll("paperIds")
-      .map((id) => (id ? String(id) : ""))
+      .map((id: FormDataEntryValue) => (id ? String(id) : ""))
       .filter(Boolean);
 
     if (!title) return { error: "Title is required." };
@@ -246,7 +265,7 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "Failed to create issue." };
     }
 
-    const mappings = articleIds.map((articleId, idx) => ({
+    const mappings = articleIds.map((articleId: string, idx: number) => ({
       issue_id: issue.id,
       article_id: articleId,
       position: idx,
@@ -291,10 +310,7 @@ export default function IssuesPage() {
     availableTotalPages,
     schemaMissing,
   } = useLoaderData<typeof loader>();
-  const rootData = useRouteLoaderData("root") as {
-    user?: { id: string };
-    profile?: { role_type?: string | null };
-  } | null;
+  const rootData = useRootLoaderData();
   const user = rootData?.user;
   const profile = rootData?.profile;
   const isAdmin = profile?.role_type === "admin";
@@ -496,7 +512,7 @@ export default function IssuesPage() {
                           </span>
                         </div>
                         <div className="muted text-sm">
-                          <AuthorList authors={paper.authors} />
+                          <AuthorList authors={paper.authors ?? undefined} />
                         </div>
                         <div
                           className="muted text-sm"
@@ -706,7 +722,7 @@ export default function IssuesPage() {
                               className="muted text-sm"
                               style={{ textAlign: "right" }}
                             >
-                              <AuthorList authors={article.authors} />
+                              <AuthorList authors={article.authors ?? undefined} />
                             </div>
                           </div>
                         ) : null,

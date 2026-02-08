@@ -8,8 +8,8 @@ type ProfileRow = {
   id: string;
   email: string | null;
   full_name: string | null;
-  role_type: "mentor" | "mentee" | "admin" | "prof" | null;
-  created_at?: string;
+  role_type: string | null;
+  created_at: string | null;
 };
 
 export async function loader({ request }: Route.LoaderArgs) {
