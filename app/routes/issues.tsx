@@ -600,7 +600,13 @@ export default function IssuesPage() {
                           }}
                         />
                       )}
-                      <h3 style={{ margin: 0 }}>{issue.title}</h3>
+                      <Link
+                        to={`/issues/${issue.id}`}
+                        className="nav-link"
+                        style={{ padding: 0 }}
+                      >
+                        <h3 style={{ margin: 0 }}>{issue.title}</h3>
+                      </Link>
                       <span
                         className="pill"
                         style={{

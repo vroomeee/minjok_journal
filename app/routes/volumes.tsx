@@ -510,7 +510,13 @@ export default function VolumesPage() {
                           style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }}
                         />
                       )}
-                      <h3 style={{ margin: 0 }}>{volume.title}</h3>
+                      <Link
+                        to={`/volumes/${volume.id}`}
+                        className="nav-link"
+                        style={{ padding: 0 }}
+                      >
+                        <h3 style={{ margin: 0 }}>{volume.title}</h3>
+                      </Link>
                       <span
                         className="pill"
                         style={{
@@ -562,7 +568,13 @@ export default function VolumesPage() {
                             style={{ justifyContent: "space-between", alignItems: "center" }}
                           >
                             <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              <span style={{ fontWeight: 600 }}>{issue.title}</span>
+                              <Link
+                                to={`/issues/${issue.id}`}
+                                className="nav-link"
+                                style={{ padding: 0, fontWeight: 600 }}
+                              >
+                                {issue.title}
+                              </Link>
                               <span className="pill subtle">{issue.status}</span>
                             </div>
                             <span className="muted text-sm" style={{ textAlign: "right" }}>

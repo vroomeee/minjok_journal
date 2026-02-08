@@ -56,7 +56,9 @@ export default [
 
   // Issues and Volumes
   route("issues", "routes/issues.tsx"),
+  route("issues/:issueId", "routes/issues.$issueId.tsx"),
   route("volumes", "routes/volumes.tsx"),
+  route("volumes/:volumeId", "routes/volumes.$volumeId.tsx"),
 
   // Admin
   route("admin", "routes/admin.tsx"),

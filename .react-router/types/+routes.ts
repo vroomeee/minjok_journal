@@ -132,8 +132,18 @@ type Pages = {
   "/issues": {
     params: {};
   };
+  "/issues/:issueId": {
+    params: {
+      "issueId": string;
+    };
+  };
   "/volumes": {
     params: {};
+  };
+  "/volumes/:volumeId": {
+    params: {
+      "volumeId": string;
+    };
   };
   "/admin": {
     params: {};
@@ -143,7 +153,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/qna/:questionId/edit" | "/qna/reply/:replyId/edit" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit" | "/api/search-profiles" | "/issues" | "/volumes" | "/admin";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/qna/:questionId/edit" | "/qna/reply/:replyId/edit" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit" | "/api/search-profiles" | "/issues" | "/issues/:issueId" | "/volumes" | "/volumes/:volumeId" | "/admin";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -273,9 +283,17 @@ type RouteFiles = {
     id: "routes/issues";
     page: "/issues";
   };
+  "routes/issues.$issueId.tsx": {
+    id: "routes/issues.$issueId";
+    page: "/issues/:issueId";
+  };
   "routes/volumes.tsx": {
     id: "routes/volumes";
     page: "/volumes";
+  };
+  "routes/volumes.$volumeId.tsx": {
+    id: "routes/volumes.$volumeId";
+    page: "/volumes/:volumeId";
   };
   "routes/admin.tsx": {
     id: "routes/admin";
@@ -317,6 +335,8 @@ type RouteModules = {
   "routes/board/$postId.edit": typeof import("./app/routes/board/$postId.edit.tsx");
   "routes/api.search-profiles": typeof import("./app/routes/api.search-profiles.tsx");
   "routes/issues": typeof import("./app/routes/issues.tsx");
+  "routes/issues.$issueId": typeof import("./app/routes/issues.$issueId.tsx");
   "routes/volumes": typeof import("./app/routes/volumes.tsx");
+  "routes/volumes.$volumeId": typeof import("./app/routes/volumes.$volumeId.tsx");
   "routes/admin": typeof import("./app/routes/admin.tsx");
 };
