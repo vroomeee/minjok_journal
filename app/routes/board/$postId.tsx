@@ -138,7 +138,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     } as unknown as CommentInsert;
 
     const { error } = await supabase.from("comments").insert(payload);
-    if (error) return { error: "Failed to post comment" };
+    if (error)
+      return {
+        error: "Failed to post comment: " + (error.message ?? "unknown error"),
+      };
 
     return { success: true };
   }
@@ -179,7 +182,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       .from("comments")
       .update({ body })
       .eq("id", commentId);
-    if (error) return { error: "Failed to update comment" };
+    if (error)
+      return {
+        error: "Failed to update comment: " + (error.message ?? "unknown error"),
+      };
     return { success: true };
   }
 
