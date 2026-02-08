@@ -7,6 +7,7 @@ import {
   useLoaderData,
 } from "react-router";
 import type { Route } from "./+types/root";
+import type { ShouldRevalidateFunctionArgs } from "react-router";
 import stylesheet from "./app.css?url";
 import {
   createSupabaseServerClient,
@@ -29,6 +30,12 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export const meta: Route.MetaFunction = () => [{ title: "MinjokJournal" }];
+
+// Only re-run root loader on auth actions (login/logout/signup)
+export function shouldRevalidate({ formAction }: ShouldRevalidateFunctionArgs) {
+  if (formAction?.startsWith("/auth/")) return true;
+  return false;
+}
 
 // Loader to pass environment variables and user to client
 export async function loader({ request }: Route.LoaderArgs) {
