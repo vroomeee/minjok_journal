@@ -89,7 +89,11 @@ export async function getUserAndProfile(request: Request) {
     } = await supabase.auth.getUser();
 
     if (error) {
-      if (error.name === "AuthSessionMissingError" || error.status === 400) {
+      if (
+        error.name === "AuthSessionMissingError" ||
+        error.status === 400 ||
+        error.code === "user_not_found"
+      ) {
         // Clear invalid auth cookies to prevent repeated refresh token errors
         try {
           await supabase.auth.signOut({ scope: 'local' });
