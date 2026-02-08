@@ -53,6 +53,10 @@ export default [
 
   // API routes
   route("api/search-profiles", "routes/api.search-profiles.tsx"),
+  route(
+    "wp-admin/setup-config.php",
+    "routes/wp-admin/setup-config.php.tsx",
+  ),
 
   // Issues and Volumes
   route("issues", "routes/issues.tsx"),

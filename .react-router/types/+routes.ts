@@ -129,6 +129,9 @@ type Pages = {
   "/api/search-profiles": {
     params: {};
   };
+  "/wp-admin/setup-config.php": {
+    params: {};
+  };
   "/issues": {
     params: {};
   };
@@ -153,7 +156,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/qna/:questionId/edit" | "/qna/reply/:replyId/edit" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit" | "/api/search-profiles" | "/issues" | "/issues/:issueId" | "/volumes" | "/volumes/:volumeId" | "/admin";
+    page: "/" | "/about" | "/auth/login" | "/auth/signup" | "/auth/logout" | "/auth/forgot-password" | "/auth/reset-password" | "/auth/confirm" | "/auth/error" | "/auth/resend" | "/papers" | "/papers/new" | "/papers/:paperId" | "/papers/:paperId/publish" | "/papers/:paperId/edit" | "/papers/:paperId/new-version" | "/papers/:paperId/versions/:versionId" | "/my-papers" | "/review" | "/profile/:userId" | "/profile/:userId/edit" | "/qna" | "/qna/new" | "/qna/:questionId" | "/qna/:questionId/edit" | "/qna/reply/:replyId/edit" | "/board" | "/board/new" | "/board/:postId" | "/board/:postId/edit" | "/api/search-profiles" | "/wp-admin/setup-config.php" | "/issues" | "/issues/:issueId" | "/volumes" | "/volumes/:volumeId" | "/admin";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -279,6 +282,10 @@ type RouteFiles = {
     id: "routes/api.search-profiles";
     page: "/api/search-profiles";
   };
+  "routes/wp-admin/setup-config.php.tsx": {
+    id: "routes/wp-admin/setup-config.php";
+    page: "/wp-admin/setup-config.php";
+  };
   "routes/issues.tsx": {
     id: "routes/issues";
     page: "/issues";
@@ -334,6 +341,7 @@ type RouteModules = {
   "routes/board/$postId": typeof import("./app/routes/board/$postId.tsx");
   "routes/board/$postId.edit": typeof import("./app/routes/board/$postId.edit.tsx");
   "routes/api.search-profiles": typeof import("./app/routes/api.search-profiles.tsx");
+  "routes/wp-admin/setup-config.php": typeof import("./app/routes/wp-admin/setup-config.php.tsx");
   "routes/issues": typeof import("./app/routes/issues.tsx");
   "routes/issues.$issueId": typeof import("./app/routes/issues.$issueId.tsx");
   "routes/volumes": typeof import("./app/routes/volumes.tsx");

@@ -98,14 +98,26 @@ DROP POLICY IF EXISTS "Primary author can remove coauthors" ON article_authors;
 -- Issues + junctions
 DROP POLICY IF EXISTS "issues_select_public" ON issues;
 DROP POLICY IF EXISTS "issues_modify_admin" ON issues;
+DROP POLICY IF EXISTS "issues_insert_admin" ON issues;
+DROP POLICY IF EXISTS "issues_update_admin" ON issues;
+DROP POLICY IF EXISTS "issues_delete_admin" ON issues;
 DROP POLICY IF EXISTS "issue_articles_select_public" ON issue_articles;
 DROP POLICY IF EXISTS "issue_articles_modify_admin" ON issue_articles;
+DROP POLICY IF EXISTS "issue_articles_insert_admin" ON issue_articles;
+DROP POLICY IF EXISTS "issue_articles_update_admin" ON issue_articles;
+DROP POLICY IF EXISTS "issue_articles_delete_admin" ON issue_articles;
 
 -- Volumes + junctions
 DROP POLICY IF EXISTS "volumes_select_public" ON volumes;
 DROP POLICY IF EXISTS "volumes_modify_admin" ON volumes;
+DROP POLICY IF EXISTS "volumes_insert_admin" ON volumes;
+DROP POLICY IF EXISTS "volumes_update_admin" ON volumes;
+DROP POLICY IF EXISTS "volumes_delete_admin" ON volumes;
 DROP POLICY IF EXISTS "volume_issues_select_public" ON volume_issues;
 DROP POLICY IF EXISTS "volume_issues_modify_admin" ON volume_issues;
+DROP POLICY IF EXISTS "volume_issues_insert_admin" ON volume_issues;
+DROP POLICY IF EXISTS "volume_issues_update_admin" ON volume_issues;
+DROP POLICY IF EXISTS "volume_issues_delete_admin" ON volume_issues;
 
 -- =========================
 -- Recreate consolidated policies (with initplan-friendly auth calls)
@@ -177,21 +189,31 @@ CREATE POLICY "article_versions_select_public"
   ON article_versions FOR SELECT
   USING (true);
 
-CREATE POLICY "article_versions_insert_authors"
-  ON article_versions FOR INSERT
+ CREATE POLICY "article_versions_insert_authors"
+   ON article_versions FOR INSERT
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM articles a
       WHERE a.id = article_id AND a.author_id = (select auth.uid())
     )
+    OR EXISTS (
+      SELECT 1 FROM article_authors aa
+      WHERE aa.article_id = article_id AND aa.profile_id = (select auth.uid())
+    )
   );
 
-CREATE POLICY "article_versions_update_authors_or_admin"
-  ON article_versions FOR UPDATE
+ CREATE POLICY "article_versions_update_authors_or_admin"
+   ON article_versions FOR UPDATE
   USING (
-    EXISTS (
-      SELECT 1 FROM articles a
-      WHERE a.id = article_id AND a.author_id = (select auth.uid())
+    (
+      EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id = (select auth.uid())
+      )
+      OR EXISTS (
+        SELECT 1 FROM article_authors aa
+        WHERE aa.article_id = article_id AND aa.profile_id = (select auth.uid())
+      )
     )
     OR EXISTS (
       SELECT 1 FROM profiles p
@@ -199,12 +221,18 @@ CREATE POLICY "article_versions_update_authors_or_admin"
     )
   );
 
-CREATE POLICY "article_versions_delete_authors_or_admin"
-  ON article_versions FOR DELETE
+ CREATE POLICY "article_versions_delete_authors_or_admin"
+   ON article_versions FOR DELETE
   USING (
-    EXISTS (
-      SELECT 1 FROM articles a
-      WHERE a.id = article_id AND a.author_id = (select auth.uid())
+    (
+      EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id = (select auth.uid())
+      )
+      OR EXISTS (
+        SELECT 1 FROM article_authors aa
+        WHERE aa.article_id = article_id AND aa.profile_id = (select auth.uid())
+      )
     )
     OR EXISTS (
       SELECT 1 FROM profiles p
@@ -424,8 +452,17 @@ CREATE POLICY "issues_select_public_or_admin"
     )
   );
 
-CREATE POLICY "issues_modify_admin"
-  ON issues FOR INSERT, UPDATE, DELETE
+CREATE POLICY "issues_insert_admin"
+  ON issues FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "issues_update_admin"
+  ON issues FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM profiles p
@@ -433,6 +470,15 @@ CREATE POLICY "issues_modify_admin"
     )
   )
   WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "issues_delete_admin"
+  ON issues FOR DELETE
+  USING (
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
@@ -449,8 +495,17 @@ CREATE POLICY "issue_articles_select_public_or_admin"
     )
   );
 
-CREATE POLICY "issue_articles_modify_admin"
-  ON issue_articles FOR INSERT, UPDATE, DELETE
+CREATE POLICY "issue_articles_insert_admin"
+  ON issue_articles FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "issue_articles_update_admin"
+  ON issue_articles FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM profiles p
@@ -458,6 +513,15 @@ CREATE POLICY "issue_articles_modify_admin"
     )
   )
   WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "issue_articles_delete_admin"
+  ON issue_articles FOR DELETE
+  USING (
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
@@ -475,8 +539,17 @@ CREATE POLICY "volumes_select_public_or_admin"
     )
   );
 
-CREATE POLICY "volumes_modify_admin"
-  ON volumes FOR INSERT, UPDATE, DELETE
+CREATE POLICY "volumes_insert_admin"
+  ON volumes FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "volumes_update_admin"
+  ON volumes FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM profiles p
@@ -484,6 +557,15 @@ CREATE POLICY "volumes_modify_admin"
     )
   )
   WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "volumes_delete_admin"
+  ON volumes FOR DELETE
+  USING (
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
@@ -500,8 +582,17 @@ CREATE POLICY "volume_issues_select_public_or_admin"
     )
   );
 
-CREATE POLICY "volume_issues_modify_admin"
-  ON volume_issues FOR INSERT, UPDATE, DELETE
+CREATE POLICY "volume_issues_insert_admin"
+  ON volume_issues FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "volume_issues_update_admin"
+  ON volume_issues FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM profiles p
@@ -509,6 +600,15 @@ CREATE POLICY "volume_issues_modify_admin"
     )
   )
   WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "volume_issues_delete_admin"
+  ON volume_issues FOR DELETE
+  USING (
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
