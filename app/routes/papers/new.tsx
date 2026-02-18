@@ -39,7 +39,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!isEnglishFileName(file.name)) {
     return {
       error:
-        "File name must only use English letters, numbers, dots, hyphens, or underscores.",
+        "File name must only use English letters, numbers, dots, hyphens, or underscores (spaces are not allowed).",
     };
   }
 
