@@ -15,6 +15,23 @@ export async function action({ request }: ActionFunctionArgs) {
   const { supabase, headers } = createSupabaseServerClient(request);
   const origin = new URL(request.url).origin;
 
+  if (!email) {
+    return Response.json({ error: "Email is required" }, { status: 400, headers });
+  }
+
+  // If the email isn't in our profiles table, bail early with a helpful message.
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  if (!existingProfile) {
+    return Response.json(
+      { error: "We could not find an account with that email. Try signing up instead." },
+      { status: 400, headers }
+    );
+  }
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/confirm?next=/auth/reset-password`,
   });

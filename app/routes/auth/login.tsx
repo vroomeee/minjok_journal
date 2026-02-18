@@ -9,6 +9,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
+  if (!email) {
+    return Response.json({ error: "Email is required" }, { status: 400, headers });
+  }
+
+  // If the email isn't in our profiles table, show a friendly message.
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  if (!existingProfile) {
+    return Response.json(
+      { error: "No account found with that email. Try signing up instead." },
+      { status: 400, headers }
+    );
+  }
+
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
