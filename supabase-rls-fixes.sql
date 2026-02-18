@@ -502,6 +502,14 @@ CREATE POLICY "issue_articles_insert_admin"
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
     )
+    AND EXISTS (
+      SELECT 1 FROM issues i
+      WHERE i.id = issue_id
+    )
+    AND EXISTS (
+      SELECT 1 FROM articles a
+      WHERE a.id = article_id AND a.status = 'published'
+    )
   );
 
 CREATE POLICY "issue_articles_update_admin"
@@ -516,6 +524,14 @@ CREATE POLICY "issue_articles_update_admin"
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+    AND EXISTS (
+      SELECT 1 FROM issues i
+      WHERE i.id = issue_id
+    )
+    AND EXISTS (
+      SELECT 1 FROM articles a
+      WHERE a.id = article_id AND a.status = 'published'
     )
   );
 
@@ -589,6 +605,14 @@ CREATE POLICY "volume_issues_insert_admin"
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
     )
+    AND EXISTS (
+      SELECT 1 FROM volumes v
+      WHERE v.id = volume_id
+    )
+    AND EXISTS (
+      SELECT 1 FROM issues i
+      WHERE i.id = issue_id AND i.status = 'released'
+    )
   );
 
 CREATE POLICY "volume_issues_update_admin"
@@ -603,6 +627,14 @@ CREATE POLICY "volume_issues_update_admin"
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+    AND EXISTS (
+      SELECT 1 FROM volumes v
+      WHERE v.id = volume_id
+    )
+    AND EXISTS (
+      SELECT 1 FROM issues i
+      WHERE i.id = issue_id AND i.status = 'released'
     )
   );
 

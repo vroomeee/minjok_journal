@@ -3,6 +3,7 @@ import {
   Link,
   useActionData,
   useLoaderData,
+  useNavigation,
 } from "react-router";
 import type { Route } from "./+types/issues";
 import {
@@ -11,7 +12,7 @@ import {
 } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuthorList } from "~/components/author-list";
 import { useRootLoaderData } from "~/lib/root-data";
 import { cleanupIssuesAndVolumes } from "~/lib/issues";
@@ -211,6 +212,7 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
   const issueId = formData.get("issueId") as string | null;
+  const MAX_COVER_SIZE = 10 * 1024 * 1024; // 10 MB
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -227,7 +229,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "delete-issue") {
     if (!issueId) return { error: "Missing issue" };
     await cleanupIssuesAndVolumes(supabase, [issueId], { force: true });
-    return { success: true };
+    return { success: "deleted" as const };
   }
 
   if (intent === "create-issue") {
@@ -239,10 +241,14 @@ export async function action({ request }: Route.ActionArgs) {
         ? ("draft" as const)
         : ("released" as const);
     const coverFile = formData.get("cover") as File | null;
-    const articleIds = formData
+    const articleIds = Array.from(
+      new Set(
+        formData
       .getAll("paperIds")
       .map((id: FormDataEntryValue) => (id ? String(id) : ""))
-      .filter(Boolean);
+      .filter(Boolean),
+      ),
+    );
 
     if (!title) return { error: "Title is required." };
     if (!articleIds.length) {
@@ -250,6 +256,55 @@ export async function action({ request }: Route.ActionArgs) {
     }
     if (!coverFile || typeof coverFile === "string" || coverFile.size === 0) {
       return { error: "Cover image is required." };
+    }
+    if (coverFile.size > MAX_COVER_SIZE) {
+      return { error: "Cover image is too large. Maximum size is 10 MB." };
+    }
+    if (coverFile.type && !coverFile.type.startsWith("image/")) {
+      return { error: "Cover must be an image file." };
+    }
+
+    const { data: selectedArticles, error: selectedArticlesError } =
+      await supabase
+        .from("articles")
+        .select("id,status")
+        .in("id", articleIds);
+
+    if (selectedArticlesError) {
+      return { error: "Failed to validate selected papers." };
+    }
+
+    if ((selectedArticles?.length ?? 0) !== articleIds.length) {
+      return {
+        error:
+          "Some selected papers no longer exist. Refresh and select again.",
+      };
+    }
+
+    const hasNonPublished = (selectedArticles ?? []).some(
+      (article) => article.status !== "published",
+    );
+    if (hasNonPublished) {
+      return {
+        error:
+          "Only published papers can be attached to an issue. Refresh and try again.",
+      };
+    }
+
+    const { data: existingLinks, error: existingLinksError } = await supabase
+      .from("issue_articles")
+      .select("article_id")
+      .in("article_id", articleIds);
+
+    if (existingLinksError) {
+      return { error: "Failed to verify duplicate paper assignments." };
+    }
+
+    if ((existingLinks ?? []).length > 0) {
+      return {
+        error:
+          "Some selected papers are already attached to another issue. Refresh and try again.",
+      };
     }
 
     const release_date =
@@ -265,6 +320,11 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "Failed to create issue." };
     }
 
+    const rollbackIssue = async () => {
+      await supabase.from("issue_articles").delete().eq("issue_id", issue.id);
+      await supabase.from("issues").delete().eq("id", issue.id);
+    };
+
     const mappings = articleIds.map((articleId: string, idx: number) => ({
       issue_id: issue.id,
       article_id: articleId,
@@ -276,27 +336,38 @@ export async function action({ request }: Route.ActionArgs) {
       .insert(mappings);
 
     if (mappingError) {
+      await rollbackIssue();
+      if (mappingError.code === "23505") {
+        return {
+          error:
+            "Some selected papers were assigned to another issue just now. Refresh and try again.",
+        };
+      }
       return { error: "Issue created, but failed to attach papers." };
     }
 
-    if (coverFile && coverFile.size > 0) {
-      const path = `${user.id}/issues/${issue.id}/${Date.now()}-${coverFile.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("covers")
-        .upload(path, coverFile, { contentType: coverFile.type || undefined });
-      if (uploadError) {
-        return { error: "Issue created, but failed to upload cover." };
-      }
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("covers").getPublicUrl(path);
-      await supabase
-        .from("issues")
-        .update({ cover_url: publicUrl })
-        .eq("id", issue.id);
+    const path = `${user.id}/issues/${issue.id}/${Date.now()}-${coverFile.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("covers")
+      .upload(path, coverFile, { contentType: coverFile.type || undefined });
+    if (uploadError) {
+      await rollbackIssue();
+      return { error: "Issue created, but failed to upload cover." };
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("covers").getPublicUrl(path);
+    const { error: updateCoverError } = await supabase
+      .from("issues")
+      .update({ cover_url: publicUrl })
+      .eq("id", issue.id);
+    if (updateCoverError) {
+      await supabase.storage.from("covers").remove([path]);
+      await rollbackIssue();
+      return { error: "Issue created, but failed to save cover URL." };
     }
 
-    return { success: true };
+    return { success: "created" as const };
   }
 
   return { error: "Unknown action." };
@@ -315,7 +386,19 @@ export default function IssuesPage() {
   const profile = rootData?.profile;
   const isAdmin = profile?.role_type === "admin";
   const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const createFormRef = useRef<HTMLFormElement>(null);
   const [coverName, setCoverName] = useState<string | null>(null);
+  const isCreatingIssue =
+    navigation.state === "submitting" &&
+    navigation.formData?.get("intent") === "create-issue";
+
+  useEffect(() => {
+    if (actionData?.success === "created") {
+      createFormRef.current?.reset();
+      setCoverName(null);
+    }
+  }, [actionData?.success]);
 
   return (
     <div className="page">
@@ -384,7 +467,9 @@ export default function IssuesPage() {
                   className="text-sm"
                   style={{ color: "var(--accent)", margin: 0 }}
                 >
-                  Issue created.
+                  {actionData.success === "deleted"
+                    ? "Issue deleted."
+                    : "Issue created."}
                 </p>
               </div>
             )}
@@ -394,6 +479,7 @@ export default function IssuesPage() {
               encType="multipart/form-data"
               className="list"
               style={{ gap: 12 }}
+              ref={createFormRef}
             >
               <input type="hidden" name="intent" value="create-issue" />
               <div className="row" style={{ gap: 12 }}>
@@ -562,8 +648,12 @@ export default function IssuesPage() {
                 className="row"
                 style={{ justifyContent: "flex-end", gap: 8 }}
               >
-                <button type="submit" className="btn btn-accent">
-                  Create issue
+                <button
+                  type="submit"
+                  className="btn btn-accent"
+                  disabled={isCreatingIssue}
+                >
+                  {isCreatingIssue ? "Creating..." : "Create issue"}
                 </button>
               </div>
             </Form>

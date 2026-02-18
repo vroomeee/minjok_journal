@@ -1,9 +1,16 @@
-import { Form, Link, useActionData, useLoaderData } from "react-router";
+import {
+  Form,
+  Link,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+} from "react-router";
 import type { Route } from "./+types/volumes";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRootLoaderData } from "~/lib/root-data";
+import { collectStorageObjectPaths } from "~/lib/storage";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -193,6 +200,7 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
   const volumeId = formData.get("volumeId") as string | null;
+  const MAX_COVER_SIZE = 10 * 1024 * 1024; // 10 MB
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -208,10 +216,22 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "delete-volume") {
     if (!volumeId) return { error: "Missing volume" };
+    const { data: targetVolume } = await supabase
+      .from("volumes")
+      .select("cover_url")
+      .eq("id", volumeId)
+      .maybeSingle();
     // Remove from volume_issues first (cleanup junction table)
     await supabase.from("volume_issues").delete().eq("volume_id", volumeId);
     const { error } = await supabase.from("volumes").delete().eq("id", volumeId);
     if (error) return { error: "Failed to delete volume." };
+    const coverPaths = collectStorageObjectPaths(
+      [targetVolume?.cover_url],
+      "covers",
+    );
+    if (coverPaths.length > 0) {
+      await supabase.storage.from("covers").remove(coverPaths);
+    }
     return { success: "deleted" as const };
   }
 
@@ -222,10 +242,14 @@ export async function action({ request }: Route.ActionArgs) {
     const status =
       formData.get("status") === "draft" ? ("draft" as const) : ("released" as const);
     const coverFile = formData.get("cover") as File | null;
-    const issueIds = formData
-      .getAll("issueIds")
-      .map((id: FormDataEntryValue) => (id ? String(id) : ""))
-      .filter(Boolean);
+    const issueIds = Array.from(
+      new Set(
+        formData
+          .getAll("issueIds")
+          .map((id: FormDataEntryValue) => (id ? String(id) : ""))
+          .filter(Boolean),
+      ),
+    );
 
     if (!title) return { error: "Title is required." };
     if (!issueIds.length) {
@@ -233,6 +257,48 @@ export async function action({ request }: Route.ActionArgs) {
     }
     if (!coverFile || typeof coverFile === "string" || coverFile.size === 0) {
       return { error: "Cover image is required." };
+    }
+    if (coverFile.size > MAX_COVER_SIZE) {
+      return { error: "Cover image is too large. Maximum size is 10 MB." };
+    }
+    if (coverFile.type && !coverFile.type.startsWith("image/")) {
+      return { error: "Cover must be an image file." };
+    }
+
+    const { data: selectedIssues, error: selectedIssuesError } = await supabase
+      .from("issues")
+      .select("id,status")
+      .in("id", issueIds);
+    if (selectedIssuesError) {
+      return { error: "Failed to validate selected issues." };
+    }
+    if ((selectedIssues?.length ?? 0) !== issueIds.length) {
+      return {
+        error: "Some selected issues no longer exist. Refresh and select again.",
+      };
+    }
+    const hasNonReleased = (selectedIssues ?? []).some(
+      (issue) => issue.status !== "released",
+    );
+    if (hasNonReleased) {
+      return {
+        error:
+          "Only released issues can be attached to a volume. Refresh and try again.",
+      };
+    }
+
+    const { data: existingLinks, error: existingLinksError } = await supabase
+      .from("volume_issues")
+      .select("issue_id")
+      .in("issue_id", issueIds);
+    if (existingLinksError) {
+      return { error: "Failed to verify duplicate issue assignments." };
+    }
+    if ((existingLinks ?? []).length > 0) {
+      return {
+        error:
+          "Some selected issues are already attached to another volume. Refresh and try again.",
+      };
     }
 
     const release_date = status === "released" ? new Date().toISOString() : null;
@@ -247,6 +313,11 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "Failed to create volume." };
     }
 
+    const rollbackVolume = async () => {
+      await supabase.from("volume_issues").delete().eq("volume_id", volume.id);
+      await supabase.from("volumes").delete().eq("id", volume.id);
+    };
+
     const mappings = issueIds.map((issueId: string, idx: number) => ({
       volume_id: volume.id,
       issue_id: issueId,
@@ -258,6 +329,13 @@ export async function action({ request }: Route.ActionArgs) {
       .insert(mappings);
 
     if (mappingError) {
+      await rollbackVolume();
+      if (mappingError.code === "23505") {
+        return {
+          error:
+            "Some selected issues were assigned to another volume just now. Refresh and try again.",
+        };
+      }
       return { error: "Volume created, but failed to attach issues." };
     }
 
@@ -266,12 +344,21 @@ export async function action({ request }: Route.ActionArgs) {
       .from("covers")
       .upload(path, coverFile, { contentType: coverFile.type || undefined });
     if (uploadError) {
+      await rollbackVolume();
       return { error: "Volume created, but failed to upload cover." };
     }
     const {
       data: { publicUrl },
     } = supabase.storage.from("covers").getPublicUrl(path);
-    await supabase.from("volumes").update({ cover_url: publicUrl }).eq("id", volume.id);
+    const { error: updateCoverError } = await supabase
+      .from("volumes")
+      .update({ cover_url: publicUrl })
+      .eq("id", volume.id);
+    if (updateCoverError) {
+      await supabase.storage.from("covers").remove([path]);
+      await rollbackVolume();
+      return { error: "Volume created, but failed to save cover URL." };
+    }
 
     return { success: "created" as const };
   }
@@ -292,7 +379,19 @@ export default function VolumesPage() {
   const profile = rootData?.profile;
   const isAdmin = profile?.role_type === "admin";
   const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const createFormRef = useRef<HTMLFormElement>(null);
   const [coverName, setCoverName] = useState<string | null>(null);
+  const isCreatingVolume =
+    navigation.state === "submitting" &&
+    navigation.formData?.get("intent") === "create-volume";
+
+  useEffect(() => {
+    if (actionData?.success === "created") {
+      createFormRef.current?.reset();
+      setCoverName(null);
+    }
+  }, [actionData?.success]);
 
   return (
     <div className="page">
@@ -348,7 +447,13 @@ export default function VolumesPage() {
           </div>
         )}
 
-            <Form method="post" encType="multipart/form-data" className="list" style={{ gap: 12 }}>
+            <Form
+              method="post"
+              encType="multipart/form-data"
+              className="list"
+              style={{ gap: 12 }}
+              ref={createFormRef}
+            >
               <input type="hidden" name="intent" value="create-volume" />
               <div className="row" style={{ gap: 12 }}>
                 <div style={{ flex: 2 }}>
@@ -494,8 +599,12 @@ export default function VolumesPage() {
               </div>
 
               <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
-                <button type="submit" className="btn btn-accent">
-                  Create volume
+                <button
+                  type="submit"
+                  className="btn btn-accent"
+                  disabled={isCreatingVolume}
+                >
+                  {isCreatingVolume ? "Creating..." : "Create volume"}
                 </button>
               </div>
             </Form>
