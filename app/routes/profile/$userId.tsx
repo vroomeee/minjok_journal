@@ -31,13 +31,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: papers } = await supabase
     .from("articles")
-    .select("*")
-    .eq("author_id", userId)
+    .select(
+      `
+      *,
+      authors:article_authors!inner(
+        profile_id
+      )
+    `
+    )
+    .eq("authors.profile_id", userId)
     .order("created_at", { ascending: false });
 
-  const formattedPapers = (papers || []).map((p) => ({
-    ...p,
-    formattedDate: formatDate(p.created_at),
+  const formattedPapers = (papers || []).map(({ authors: _authors, ...paper }) => ({
+    ...paper,
+    formattedDate: formatDate(paper.created_at),
   }));
 
   return { profile, papers: formattedPapers };
