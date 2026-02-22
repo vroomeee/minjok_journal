@@ -56,7 +56,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         *,
         authors:article_authors(
           profile_id,
-          profile:profiles!profile_id(
+          profile:profiles!article_authors_profile_id_fkey(
             id,
             full_name,
             email,
@@ -173,13 +173,14 @@ export async function action({ request, params }: Route.ActionArgs) {
   const isAuthor =
     paper?.author_id === user.id ||
     paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+  const isPrimaryAuthor = paper?.author_id === user.id;
 
   if ((intent === "updateNotes" || intent === "deleteNotes") && !paper) {
     return { error: "Paper not found" };
   }
 
   if (intent === "deleteVersion") {
-    if (!paper || (!isAuthor && !isAdmin))
+    if (!paper || (!isPrimaryAuthor && !isAdmin))
       return { error: "Unauthorized to delete this version" };
 
     const { data: versions } = await supabase
@@ -376,11 +377,12 @@ export default function VersionReview() {
     }
   }, [commentFetcher.state, commentFetcher.data, revalidator]);
   const isAdmin = profile?.role_type === "admin";
-  const isAuthor = paper?.authors?.some(
-    (a: { profile_id: string }) => a.profile_id === user?.id
-  );
+  const isAuthor =
+    paper?.author_id === user?.id ||
+    paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user?.id);
+  const isPrimaryAuthor = paper?.author_id === user?.id;
   const canEditNotes = isAdmin || isAuthor;
-  const canDeleteVersion = isAdmin || isAuthor;
+  const canDeleteVersion = isAdmin || isPrimaryAuthor;
   const deleteWarning =
     totalVersions === 1
       ? "WARNING: this is the only version of the paper. If you delete this, the paper will be deleted as well."

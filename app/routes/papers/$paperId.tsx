@@ -175,14 +175,15 @@ export async function action({ request, params }: Route.ActionArgs) {
       paper?.authors?.some(
         (a: { profile_id: string }) => a.profile_id === user.id,
       );
+    const isPrimaryAuthor = paper?.author_id === user.id;
     const isAdmin = profile.role_type === "admin";
-    return { user, profile, paper, isAuthor, isAdmin };
+    return { user, profile, paper, isAuthor, isPrimaryAuthor, isAdmin };
   };
 
   if (intent === "delete") {
-    const { user, profile, paper, isAuthor, isAdmin } = await getAccess();
+    const { user, profile, paper, isPrimaryAuthor, isAdmin } = await getAccess();
 
-    if (!paper || (!isAuthor && !isAdmin)) {
+    if (!paper || (!isPrimaryAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -228,15 +229,15 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "updateStatus") {
     const newStatus = formData.get("status") as string;
 
-    const { paper, isAuthor, isAdmin } = await getAccess();
+    const { paper, isPrimaryAuthor, isAdmin } = await getAccess();
 
-    if (!paper || (!isAuthor && !isAdmin)) {
+    if (!paper || (!isPrimaryAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
     // Validate allowed status transitions
     const allowed =
-      (paper.status === "draft" && newStatus === "in_review" && isAuthor) ||
+      (paper.status === "draft" && newStatus === "in_review" && isPrimaryAuthor) ||
       (paper.status === "in_review" && newStatus === "published" && isAdmin);
 
     if (!allowed) {
@@ -256,9 +257,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "unpublish") {
-    const { paper, isAuthor, isAdmin } = await getAccess();
+    const { paper, isPrimaryAuthor, isAdmin } = await getAccess();
 
-    if (!paper || (!isAuthor && !isAdmin)) {
+    if (!paper || (!isPrimaryAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -293,13 +294,13 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "updateTitle") {
-    const { paper, isAuthor, isAdmin } = await getAccess();
+    const { paper, isPrimaryAuthor, isAdmin } = await getAccess();
     const newTitle = formData.get("title") as string;
     if (!newTitle) {
       return { error: "Title is required" };
     }
 
-    if (!paper || (!isAuthor && !isAdmin)) {
+    if (!paper || (!isPrimaryAuthor && !isAdmin)) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -442,14 +443,16 @@ export default function PaperDetail() {
     paper.status !== "published",
   );
 
-  const isAuthor = paper.authors?.some(
-    (a: { profile_id: string }) => a.profile_id === user?.id,
-  );
+  const isAuthor =
+    paper.author_id === user?.id ||
+    paper.authors?.some((a: { profile_id: string }) => a.profile_id === user?.id);
+  const isPrimaryAuthor = paper.author_id === user?.id;
   const isAdmin = profile?.role_type === "admin";
-  const canDelete = isAuthor || isAdmin;
+  const canManagePaper = isPrimaryAuthor || isAdmin;
+  const canDelete = canManagePaper;
   const canPublish = isAdmin;
   const canUploadNewVersion = isAuthor && paper.status !== "published";
-  const canSubmitForReview = isAuthor && paper.status === "draft";
+  const canSubmitForReview = isPrimaryAuthor && paper.status === "draft";
   const showComments = paper.status === "published" && !!activeVersionId;
   const truncateNotes = (notes?: string | null) =>
     notes && notes.length > 200 ? `${notes.slice(0, 200)}...` : notes;
@@ -476,9 +479,9 @@ export default function PaperDetail() {
           >
             <div className="row" style={{ gap: 10 }}>
               <h1 style={{ fontSize: 26 }}>{paper.title}</h1>
-              {(isAuthor || isAdmin) && (
+              {canManagePaper && (
                 <Link to={`/papers/${paper.id}/edit`} className="btn">
-                  Edit Title or Description
+                  Edit Paper
                 </Link>
               )}
             </div>
@@ -506,7 +509,7 @@ export default function PaperDetail() {
 
           {(isAuthor || isAdmin) && (
             <div className="row-wrap" style={{ marginTop: 4 }}>
-              {isAuthor && canSubmitForReview && (
+              {canSubmitForReview && (
                 <Form method="post">
                   <input type="hidden" name="intent" value="updateStatus" />
                   <input type="hidden" name="status" value="in_review" />
@@ -531,7 +534,7 @@ export default function PaperDetail() {
                   Publish
                 </Link>
               )}
-              {canPublish && paper.status === "published" && (
+              {canManagePaper && paper.status === "published" && (
                 <Form method="post">
                   <input type="hidden" name="intent" value="unpublish" />
                   <button type="submit" className="btn btn-warn">

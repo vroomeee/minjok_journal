@@ -1,6 +1,10 @@
 import { Form, redirect, useActionData, useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/$paperId.new-version";
-import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
+import {
+  requireUser,
+  createSupabaseAdminClient,
+  createSupabaseServerClient,
+} from "~/lib/supabase.server";
 import { isEnglishFileName } from "~/lib/file-names";
 import { Nav } from "~/components/nav";
 
@@ -46,6 +50,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
+  const adminClient = createSupabaseAdminClient();
+  const db = adminClient?.supabase || supabase;
   const { paperId } = params;
 
   const formData = await request.formData();
@@ -117,13 +123,30 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (versionError || !version) return { error: "Failed to create version record" };
 
-  await supabase
+  const { error: updatePaperError } = await db
     .from("articles")
     .update({
       current_version_id: version.id,
       updated_at: new Date().toISOString(),
     })
     .eq("id", paperId);
+
+  if (updatePaperError) {
+    // Keep state consistent when metadata update fails after upload+version insert.
+    await supabase
+      .from("article_versions")
+      .delete()
+      .eq("id", version.id);
+    await supabase.storage.from("articles").remove([filePath]);
+
+    if (!adminClient && paper.author_id !== user.id) {
+      return {
+        error:
+          "Failed to finalize the new version for a coauthor because this server is missing SUPABASE_SERVICE_ROLE_KEY.",
+      };
+    }
+    return { error: "Failed to finalize the new version." };
+  }
 
   return redirect(`/papers/${paperId}`);
 }

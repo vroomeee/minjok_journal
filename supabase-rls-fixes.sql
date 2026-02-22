@@ -395,36 +395,88 @@ CREATE POLICY "article_authors_select_public"
 CREATE POLICY "article_authors_manage_authors"
   ON article_authors FOR INSERT
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM articles a
-      WHERE a.id = article_id AND a.author_id = (select auth.uid())
+    (
+      EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id = (select auth.uid())
+      )
+      OR EXISTS (
+        SELECT 1 FROM profiles p
+        WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+      )
     )
-    OR EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    AND (
+      (
+        EXISTS (
+          SELECT 1 FROM articles a
+          WHERE a.id = article_id AND a.author_id = profile_id
+        )
+        AND COALESCE(is_corresponding, false) = true
+      )
+      OR (
+        EXISTS (
+          SELECT 1 FROM articles a
+          WHERE a.id = article_id AND a.author_id <> profile_id
+        )
+        AND COALESCE(is_corresponding, false) = false
+      )
     )
   );
 
 CREATE POLICY "article_authors_update_authors_or_admin"
   ON article_authors FOR UPDATE
   USING (
-    EXISTS (
-      SELECT 1 FROM articles a
-      WHERE a.id = article_id AND a.author_id = (select auth.uid())
-    )
-    OR EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    (
+      EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id = (select auth.uid())
+      )
+      OR EXISTS (
+        SELECT 1 FROM profiles p
+        WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+      )
     )
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM articles a
-      WHERE a.id = article_id AND a.author_id = (select auth.uid())
+    (
+      EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id = (select auth.uid())
+      )
+      OR EXISTS (
+        SELECT 1 FROM profiles p
+        WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+      )
     )
-    OR EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    AND (
+      (
+        EXISTS (
+          SELECT 1 FROM articles a
+          WHERE a.id = article_id AND a.author_id = profile_id
+        )
+        AND COALESCE(is_corresponding, false) = true
+      )
+      OR (
+        EXISTS (
+          SELECT 1 FROM articles a
+          WHERE a.id = article_id AND a.author_id <> profile_id
+        )
+        AND COALESCE(is_corresponding, false) = false
+      )
+    )
+    AND (
+      EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id = profile_id
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM article_authors aa_primary
+        JOIN articles a ON a.id = aa_primary.article_id
+        WHERE aa_primary.article_id = article_authors.article_id
+          AND aa_primary.profile_id = a.author_id
+          AND aa_primary.id <> article_authors.id
+      )
     )
   );
 
@@ -432,12 +484,18 @@ CREATE POLICY "article_authors_delete_authors_or_admin"
   ON article_authors FOR DELETE
   USING (
     EXISTS (
-      SELECT 1 FROM articles a
-      WHERE a.id = article_id AND a.author_id = (select auth.uid())
-    )
-    OR EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+    OR (
+      EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id = (select auth.uid())
+      )
+      AND EXISTS (
+        SELECT 1 FROM articles a
+        WHERE a.id = article_id AND a.author_id <> profile_id
+      )
     )
   );
 
