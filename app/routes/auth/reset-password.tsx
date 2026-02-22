@@ -1,6 +1,13 @@
 import { Link, redirect, useFetcher, type LoaderFunctionArgs, type ActionFunctionArgs } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
+import { buildAuthFeedback, type AuthFeedbackCode } from "~/lib/auth-feedback";
+
+type ResetPasswordActionData = {
+  code?: AuthFeedbackCode;
+  error?: string;
+  hint?: string;
+};
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase, headers } = createSupabaseServerClient(request);
@@ -21,19 +28,37 @@ export async function action({ request }: ActionFunctionArgs) {
   const repeat = (formData.get("repeatPassword") as string) || "";
 
   if (!password) {
-    return Response.json({ error: "Password is required" }, { status: 400 });
+    return Response.json(
+      { code: "unknown", error: "Password is required", hint: "Enter a new password to continue." },
+      { status: 400 }
+    );
+  }
+
+  if (password.length < 8) {
+    return Response.json(
+      {
+        code: "weak_password",
+        error: "Password must be at least 8 characters.",
+        hint: "Use a stronger password with a mix of letters, numbers, and symbols.",
+      },
+      { status: 400 }
+    );
   }
 
   if (password !== repeat) {
-    return Response.json({ error: "Passwords do not match." }, { status: 400 });
+    return Response.json(
+      { code: "unknown", error: "Passwords do not match.", hint: "Re-enter both password fields so they match." },
+      { status: 400 }
+    );
   }
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
+    const feedback = buildAuthFeedback("reset_password", error);
     return Response.json(
-      { error: error.message || "Could not reset password." },
+      feedback,
       { status: 400, headers }
     );
   }
@@ -42,8 +67,9 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ResetPassword() {
-  const fetcher = useFetcher<{ error?: string }>();
+  const fetcher = useFetcher<ResetPasswordActionData>();
   const error = fetcher.data?.error;
+  const hint = fetcher.data?.hint;
   const loading = fetcher.state === "submitting";
 
   return (
@@ -61,6 +87,11 @@ export default function ResetPassword() {
               <p className="text-sm" style={{ color: "#f6b8bd" }}>
                 {error}
               </p>
+              {hint && (
+                <p className="text-sm muted" style={{ marginTop: 6 }}>
+                  {hint}
+                </p>
+              )}
             </div>
           )}
 

@@ -1,7 +1,15 @@
-import { Link, useFetcher } from "react-router";
+import { Link, useFetcher, useSearchParams } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
+import { buildAuthFeedback, type AuthFeedbackCode } from "~/lib/auth-feedback";
+
+type ResendActionData = {
+  code?: AuthFeedbackCode;
+  error?: string;
+  hint?: string;
+  resent?: boolean;
+};
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabase, headers } = createSupabaseServerClient(request);
@@ -12,7 +20,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const email = formData.get("email") as string;
 
   if (!email) {
-    return Response.json({ error: "Email is required" }, { status: 400, headers });
+    return Response.json(
+      { code: "unknown", error: "Email is required", hint: "Enter the email address used during signup." },
+      { status: 400, headers }
+    );
   }
 
   // If the email isn't in our profiles table, bail early.
@@ -23,7 +34,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     .maybeSingle();
   if (!existingProfile) {
     return Response.json(
-      { error: "We could not find an account with that email. Try signing up instead." },
+      {
+        code: "account_not_found",
+        error: "We could not find an account with that email.",
+        hint: "Check for typos, or sign up if you do not have an account yet.",
+      },
       { status: 400, headers }
     );
   }
@@ -35,13 +50,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (error) {
-    const msg =
-      error.message?.toLowerCase().includes("already confirmed") ||
-      error.message?.toLowerCase().includes("already verified")
-        ? "This email is already confirmed. You can log in now."
-        : error.message || "Failed to resend confirmation email";
+    const feedback = buildAuthFeedback("resend", error);
     return Response.json(
-      { error: msg },
+      feedback,
       { status: 400, headers }
     );
   }
@@ -50,10 +61,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function ResendConfirmationEmail() {
-  const fetcher = useFetcher<{ error?: string; resent?: boolean }>();
+  const fetcher = useFetcher<ResendActionData>();
+  const [searchParams] = useSearchParams();
   const loading = fetcher.state === "submitting";
   const error = fetcher.data?.error;
+  const hint = fetcher.data?.hint;
+  const code = fetcher.data?.code;
   const resent = fetcher.data?.resent;
+  const prefilledEmail = searchParams.get("email") || "";
+  const submittedEmail = fetcher.formData?.get("email");
+  const attemptedEmail = typeof submittedEmail === "string" ? submittedEmail : prefilledEmail;
+  const loginHref = attemptedEmail
+    ? `/auth/login?email=${encodeURIComponent(attemptedEmail)}`
+    : "/auth/login";
 
   return (
     <div className="page">
@@ -70,6 +90,18 @@ export default function ResendConfirmationEmail() {
               <p className="text-sm" style={{ color: "#f6b8bd" }}>
                 {error}
               </p>
+              {hint && (
+                <p className="text-sm muted" style={{ marginTop: 6 }}>
+                  {hint}
+                </p>
+              )}
+              {code === "already_confirmed" && (
+                <div className="row" style={{ marginTop: 8 }}>
+                  <Link to={loginHref} className="btn btn-ghost">
+                    Go to login
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -93,6 +125,7 @@ export default function ResendConfirmationEmail() {
                 placeholder="you@example.com"
                 required
                 className="input"
+                defaultValue={prefilledEmail}
               />
             </div>
             <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>

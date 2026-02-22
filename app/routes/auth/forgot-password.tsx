@@ -7,6 +7,13 @@ import {
 } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
+import { buildAuthFeedback, type AuthFeedbackCode } from "~/lib/auth-feedback";
+
+type ForgotPasswordActionData = {
+  code?: AuthFeedbackCode;
+  error?: string;
+  hint?: string;
+};
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
@@ -16,7 +23,10 @@ export async function action({ request }: ActionFunctionArgs) {
   const origin = new URL(request.url).origin;
 
   if (!email) {
-    return Response.json({ error: "Email is required" }, { status: 400, headers });
+    return Response.json(
+      { code: "unknown", error: "Email is required", hint: "Enter the email used for your account." },
+      { status: 400, headers }
+    );
   }
 
   // If the email isn't in our profiles table, bail early with a helpful message.
@@ -27,7 +37,11 @@ export async function action({ request }: ActionFunctionArgs) {
     .maybeSingle();
   if (!existingProfile) {
     return Response.json(
-      { error: "We could not find an account with that email. Try signing up instead." },
+      {
+        code: "account_not_found",
+        error: "We could not find an account with that email.",
+        hint: "Check for typos, or sign up if you have not created an account yet.",
+      },
       { status: 400, headers }
     );
   }
@@ -37,10 +51,9 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   if (error) {
+    const feedback = buildAuthFeedback("forgot_password", error);
     return Response.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to send reset email.",
-      },
+      feedback,
       { status: 400, headers }
     );
   }
@@ -49,12 +62,14 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ForgotPassword() {
-  const fetcher = useFetcher<{ error?: string }>();
+  const fetcher = useFetcher<ForgotPasswordActionData>();
   const [searchParams] = useSearchParams();
 
   const success = searchParams.has("success");
   const error = fetcher.data?.error;
+  const hint = fetcher.data?.hint;
   const loading = fetcher.state === "submitting";
+  const prefilledEmail = searchParams.get("email") || "";
 
   return (
     <div className="page">
@@ -100,6 +115,11 @@ export default function ForgotPassword() {
                   <p className="text-sm" style={{ color: "#f6b8bd" }}>
                     {error}
                   </p>
+                  {hint && (
+                    <p className="text-sm muted" style={{ marginTop: 6 }}>
+                      {hint}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -115,6 +135,7 @@ export default function ForgotPassword() {
                     placeholder="you@example.com"
                     required
                     className="input"
+                    defaultValue={prefilledEmail}
                   />
                 </div>
                 <div className="row" style={{ justifyContent: "space-between" }}>

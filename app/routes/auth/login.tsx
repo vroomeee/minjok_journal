@@ -1,6 +1,13 @@
 import { Link, useFetcher, redirect, useSearchParams, type ActionFunctionArgs } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
+import { buildAuthFeedback, type AuthFeedbackCode } from "~/lib/auth-feedback";
+
+type LoginActionData = {
+  code?: AuthFeedbackCode;
+  error?: string;
+  hint?: string;
+};
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabase, headers } = createSupabaseServerClient(request);
@@ -10,7 +17,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const password = formData.get("password") as string;
 
   if (!email) {
-    return Response.json({ error: "Email is required" }, { status: 400, headers });
+    return Response.json(
+      { code: "unknown", error: "Email is required", hint: "Enter the email used for your account." },
+      { status: 400, headers }
+    );
+  }
+
+  if (!password) {
+    return Response.json(
+      { code: "unknown", error: "Password is required", hint: "Enter your account password to continue." },
+      { status: 400, headers }
+    );
   }
 
   // If the email isn't in our profiles table, show a friendly message.
@@ -21,7 +38,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     .maybeSingle();
   if (!existingProfile) {
     return Response.json(
-      { error: "No account found with that email. Try signing up instead." },
+      {
+        code: "account_not_found",
+        error: "No account found with that email.",
+        hint: "Check for typos, or create a new account if you have not signed up yet.",
+      },
       { status: 400, headers }
     );
   }
@@ -29,8 +50,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
+    const feedback = buildAuthFeedback("login", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to sign in" },
+      feedback,
       { status: 400, headers }
     );
   }
@@ -39,11 +61,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Login() {
-  const fetcher = useFetcher<{ error?: string }>();
+  const fetcher = useFetcher<LoginActionData>();
   const [searchParams] = useSearchParams();
   const error = fetcher.data?.error;
+  const hint = fetcher.data?.hint;
+  const code = fetcher.data?.code;
   const loading = fetcher.state === "submitting";
   const resetComplete = searchParams.has("reset");
+  const prefilledEmail = searchParams.get("email") || "";
+  const submittedEmail = fetcher.formData?.get("email");
+  const attemptedEmail = typeof submittedEmail === "string" ? submittedEmail : prefilledEmail;
+  const resendHref = attemptedEmail
+    ? `/auth/resend?email=${encodeURIComponent(attemptedEmail)}`
+    : "/auth/resend";
+  const forgotPasswordHref = attemptedEmail
+    ? `/auth/forgot-password?email=${encodeURIComponent(attemptedEmail)}`
+    : "/auth/forgot-password";
 
   return (
     <div className="page">
@@ -77,6 +110,32 @@ export default function Login() {
               <p className="text-sm" style={{ color: "#f6b8bd" }}>
                 {error}
               </p>
+              {hint && (
+                <p className="text-sm muted" style={{ marginTop: 6 }}>
+                  {hint}
+                </p>
+              )}
+              {(code === "email_not_confirmed" ||
+                code === "invalid_credentials" ||
+                code === "account_not_found") && (
+                <div className="row" style={{ marginTop: 8 }}>
+                  {code === "email_not_confirmed" && (
+                    <Link to={resendHref} className="btn btn-ghost">
+                      Resend confirmation email
+                    </Link>
+                  )}
+                  {code === "invalid_credentials" && (
+                    <Link to={forgotPasswordHref} className="btn btn-ghost">
+                      Reset password
+                    </Link>
+                  )}
+                  {code === "account_not_found" && (
+                    <Link to="/auth/signup" className="btn btn-ghost">
+                      Create account
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -85,7 +144,14 @@ export default function Login() {
               <label className="label" htmlFor="email">
                 Email
               </label>
-              <input id="email" type="email" name="email" required className="input" />
+              <input
+                id="email"
+                type="email"
+                name="email"
+                required
+                className="input"
+                defaultValue={prefilledEmail}
+              />
             </div>
             <div>
               <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>

@@ -7,6 +7,13 @@ import {
 } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { Nav } from "~/components/nav";
+import { buildAuthFeedback, type AuthFeedbackCode } from "~/lib/auth-feedback";
+
+type SignupActionData = {
+  code?: AuthFeedbackCode;
+  error?: string;
+  hint?: string;
+};
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabase, headers } = createSupabaseServerClient(request);
@@ -15,7 +22,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const origin = url.origin;
 
   const formData = await request.formData();
-  const intent = (formData.get("intent") as string) || "signup";
   const email = formData.get("email") as string;
   const fullName = formData.get("full-name") as string;
   const password = formData.get("password") as string;
@@ -30,27 +36,44 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (existingProfile) {
     return Response.json(
       {
-        error:
-          "An account with this email already exists. Try logging in or resend the confirmation email.",
+        code: "account_exists",
+        error: "An account with this email already exists.",
+        hint: "Try logging in. If you have not confirmed your email yet, resend the confirmation email.",
       },
       { status: 400, headers }
     );
   }
 
   if (!fullName) {
-    return Response.json({ error: "Full name is required" }, { status: 400, headers });
+    return Response.json(
+      { code: "unknown", error: "Full name is required", hint: "Enter your full name to finish signup." },
+      { status: 400, headers }
+    );
   }
 
   if (!password) {
-    return Response.json({ error: "Password is required" }, { status: 400, headers });
+    return Response.json(
+      { code: "unknown", error: "Password is required", hint: "Choose a password to create your account." },
+      { status: 400, headers }
+    );
   }
 
   if (password.length < 8) {
-    return Response.json({ error: "Password must be at least 8 characters" }, { status: 400, headers });
+    return Response.json(
+      {
+        code: "weak_password",
+        error: "Password must be at least 8 characters",
+        hint: "Use at least 8 characters and include a mix of letters, numbers, and symbols.",
+      },
+      { status: 400, headers }
+    );
   }
 
   if (password !== repeatPassword) {
-    return Response.json({ error: "Passwords do not match" }, { status: 400, headers });
+    return Response.json(
+      { code: "unknown", error: "Passwords do not match", hint: "Re-enter both password fields so they match." },
+      { status: 400, headers }
+    );
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -66,10 +89,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (error) {
-    const msg =
-      error.message || "Failed to sign up";
+    const feedback = buildAuthFeedback("signup", error);
     return Response.json(
-      { error: msg },
+      feedback,
       { status: 400, headers }
     );
   }
@@ -86,12 +108,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Signup() {
-  const fetcher = useFetcher<{ error?: string }>();
+  const fetcher = useFetcher<SignupActionData>();
   const [searchParams] = useSearchParams();
 
   const success = searchParams.has("success");
   const error = fetcher.data?.error;
+  const hint = fetcher.data?.hint;
+  const code = fetcher.data?.code;
   const loading = fetcher.state === "submitting";
+  const submittedEmail = fetcher.formData?.get("email");
+  const attemptedEmail = typeof submittedEmail === "string" ? submittedEmail : "";
+  const loginHref = attemptedEmail ? `/auth/login?email=${encodeURIComponent(attemptedEmail)}` : "/auth/login";
+  const resendHref = attemptedEmail ? `/auth/resend?email=${encodeURIComponent(attemptedEmail)}` : "/auth/resend";
 
   return (
     <div className="page">
@@ -146,6 +174,21 @@ export default function Signup() {
                   <p className="text-sm" style={{ color: "#f6b8bd" }}>
                     {error}
                   </p>
+                  {hint && (
+                    <p className="text-sm muted" style={{ marginTop: 6 }}>
+                      {hint}
+                    </p>
+                  )}
+                  {code === "account_exists" && (
+                    <div className="row" style={{ marginTop: 8 }}>
+                      <Link to={loginHref} className="btn btn-ghost">
+                        Go to login
+                      </Link>
+                      <Link to={resendHref} className="btn btn-ghost">
+                        Resend confirmation email
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
 
