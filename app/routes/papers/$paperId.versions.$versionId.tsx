@@ -14,6 +14,7 @@ import {
   requireUser,
   getUserProfile,
 } from "~/lib/supabase.server";
+import { isEnglishFileName } from "~/lib/file-names";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef } from "react";
@@ -262,6 +263,89 @@ export async function action({ request, params }: Route.ActionArgs) {
     return redirect(`/papers/${paperId}`);
   }
 
+  if (intent === "replaceFile") {
+    if (!isAdmin) {
+      return { error: "Only admins can replace files for an existing version" };
+    }
+
+    const replacementFile = formData.get("replacementFile");
+    if (!(replacementFile instanceof File) || replacementFile.size === 0) {
+      return { error: "Replacement file is required" };
+    }
+    if (!isEnglishFileName(replacementFile.name)) {
+      return {
+        error:
+          "File name must only use English letters, numbers, dots, hyphens, or underscores (spaces are not allowed).",
+      };
+    }
+
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+    if (replacementFile.size > MAX_FILE_SIZE) {
+      return { error: "File too large. Maximum size is 100 MB." };
+    }
+
+    const { data: targetVersion, error: targetVersionError } = await supabase
+      .from("article_versions")
+      .select("id, article_id, storage_path")
+      .eq("id", versionId)
+      .eq("article_id", paperId)
+      .single();
+
+    if (targetVersionError || !targetVersion) {
+      return { error: "Version not found" };
+    }
+
+    const storageClient = adminClient?.supabase || supabase;
+    const { error: uploadError } = await storageClient.storage
+      .from("articles")
+      .upload(targetVersion.storage_path, replacementFile, {
+        upsert: true,
+        contentType: replacementFile.type || undefined,
+      });
+
+    if (uploadError) {
+      if (!adminClient) {
+        return {
+          error:
+            "Failed to replace version file in storage: " +
+            uploadError.message +
+            ". This server may be missing SUPABASE_SERVICE_ROLE_KEY, which is often required for admin overwrite operations when storage RLS is strict.",
+        };
+      }
+      return {
+        error:
+          "Failed to replace version file in storage: " + uploadError.message,
+      };
+    }
+
+    const { error: updateVersionError } = await db
+      .from("article_versions")
+      .update({
+        file_name: replacementFile.name,
+        file_size: replacementFile.size,
+      })
+      .eq("id", versionId)
+      .eq("article_id", paperId);
+
+    if (updateVersionError) {
+      if (!adminClient) {
+        return {
+          error:
+            "File was replaced in storage, but updating version metadata failed: " +
+            updateVersionError.message +
+            ". This server may be missing SUPABASE_SERVICE_ROLE_KEY, which can be required for admin metadata updates under strict RLS.",
+        };
+      }
+      return {
+        error:
+          "File was replaced in storage, but updating version metadata failed: " +
+          updateVersionError.message,
+      };
+    }
+
+    return redirect(`/papers/${paperId}/versions/${versionId}`);
+  }
+
   if (intent === "updateNotes" || intent === "deleteNotes") {
     if (!paper || (!isAuthor && !isAdmin))
       return { error: "Unauthorized to edit notes" };
@@ -474,6 +558,43 @@ export default function VersionReview() {
                   </button>
                 </Form>
               )}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="section-compact" style={{ marginTop: 10 }}>
+              <h4 style={{ margin: "0 0 6px", fontSize: 14 }}>
+                Admin File Replacement
+              </h4>
+              <p className="muted text-sm" style={{ margin: "0 0 8px" }}>
+                Replace the file for this version without creating a new version.
+              </p>
+              <Form
+                method="post"
+                encType="multipart/form-data"
+                className="list"
+                onSubmit={(e) => {
+                  if (
+                    !confirm(
+                      "Replace this version file in storage? This keeps the same version record."
+                    )
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <input type="hidden" name="intent" value="replaceFile" />
+                <input
+                  type="file"
+                  name="replacementFile"
+                  accept=".pdf,.doc,.docx"
+                  required
+                  className="input"
+                />
+                <button type="submit" className="btn btn-warn">
+                  Replace File (Admin)
+                </button>
+              </Form>
             </div>
           )}
 

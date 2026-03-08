@@ -66,8 +66,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     };
   }
 
-  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-  if (file.size > MAX_FILE_SIZE) return { error: "File too large. Maximum size is 50 MB." };
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+  if (file.size > MAX_FILE_SIZE) return { error: "File too large. Maximum size is 100 MB." };
 
   // Throttle duplicate uploads: limit to one version upload every 5 seconds per user.
   const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
