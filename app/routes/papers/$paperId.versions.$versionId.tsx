@@ -168,7 +168,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("author_id, authors:article_authors(profile_id)")
+    .select("author_id, status, authors:article_authors(profile_id)")
     .eq("id", paperId)
     .single();
   const isAuthor =
@@ -194,6 +194,15 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "No versions found for this paper" };
     const targetVersion = versions.find((v) => v.id === versionId);
     if (!targetVersion) return { error: "Version not found" };
+
+    const canDeleteFinalVersion =
+      isAdmin || (isPrimaryAuthor && paper.status !== "published");
+    if (versions.length === 1 && !canDeleteFinalVersion) {
+      return {
+        error:
+          "Only admins or the primary author of an unpublished paper can delete the final version",
+      };
+    }
 
     // Remove storage objects for this version (and all if deleting last)
     const targetPath = targetVersion.storage_path
@@ -466,7 +475,10 @@ export default function VersionReview() {
     paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user?.id);
   const isPrimaryAuthor = paper?.author_id === user?.id;
   const canEditNotes = isAdmin || isAuthor;
-  const canDeleteVersion = isAdmin || isPrimaryAuthor;
+  const canDeleteVersion =
+    isAdmin ||
+    (isPrimaryAuthor &&
+      (totalVersions > 1 || paper?.status !== "published"));
   const deleteWarning =
     totalVersions === 1
       ? "WARNING: this is the only version of the paper. If you delete this, the paper will be deleted as well."

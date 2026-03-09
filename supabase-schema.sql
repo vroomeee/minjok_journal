@@ -148,10 +148,10 @@ CREATE POLICY "Authors can update their own articles"
   ON articles FOR UPDATE
   USING (auth.uid() = author_id);
 
-CREATE POLICY "Authors and admins can delete articles"
+CREATE POLICY "Primary authors can delete unpublished articles; admins can delete any articles"
   ON articles FOR DELETE
   USING (
-    auth.uid() = author_id OR
+    (auth.uid() = author_id AND status <> 'published') OR
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
   );
 

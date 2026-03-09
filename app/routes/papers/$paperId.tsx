@@ -181,9 +181,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   };
 
   if (intent === "delete") {
-    const { user, profile, paper, isPrimaryAuthor, isAdmin } = await getAccess();
+    const { paper, isPrimaryAuthor, isAdmin } = await getAccess();
 
-    if (!paper || (!isPrimaryAuthor && !isAdmin)) {
+    const canDeletePaper =
+      !!paper && (isAdmin || (isPrimaryAuthor && paper.status !== "published"));
+
+    if (!canDeletePaper) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -257,9 +260,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "unpublish") {
-    const { paper, isPrimaryAuthor, isAdmin } = await getAccess();
+    const { paper, isAdmin } = await getAccess();
 
-    if (!paper || (!isPrimaryAuthor && !isAdmin)) {
+    if (!paper || !isAdmin) {
       throw new Response("Unauthorized", { status: 403 });
     }
 
@@ -449,7 +452,8 @@ export default function PaperDetail() {
   const isPrimaryAuthor = paper.author_id === user?.id;
   const isAdmin = profile?.role_type === "admin";
   const canManagePaper = isPrimaryAuthor || isAdmin;
-  const canDelete = canManagePaper;
+  const canUnpublish = isAdmin;
+  const canDelete = isAdmin || (isPrimaryAuthor && paper.status !== "published");
   const canPublish = isAdmin;
   const canUploadNewVersion = isAuthor && paper.status !== "published";
   const canSubmitForReview = isPrimaryAuthor && paper.status === "draft";
@@ -534,7 +538,7 @@ export default function PaperDetail() {
                   Publish
                 </Link>
               )}
-              {canManagePaper && paper.status === "published" && (
+              {canUnpublish && paper.status === "published" && (
                 <Form method="post">
                   <input type="hidden" name="intent" value="unpublish" />
                   <button type="submit" className="btn btn-warn">

@@ -24,6 +24,8 @@ DROP POLICY IF EXISTS "Authors and admins can delete articles" ON articles;
 DROP POLICY IF EXISTS "articles_insert_self" ON articles;
 DROP POLICY IF EXISTS "articles_update_authors_or_admin" ON articles;
 DROP POLICY IF EXISTS "articles_delete_authors_or_admin" ON articles;
+DROP POLICY IF EXISTS "articles_delete_admin_only" ON articles;
+DROP POLICY IF EXISTS "articles_delete_unpublished_authors_or_admin" ON articles;
 DROP POLICY IF EXISTS "articles_select" ON articles;
 DROP POLICY IF EXISTS "articles_select_public" ON articles;
 
@@ -174,10 +176,14 @@ CREATE POLICY "articles_update_authors_or_admin"
     )
   );
 
-CREATE POLICY "articles_delete_authors_or_admin"
+CREATE POLICY "articles_delete_unpublished_authors_or_admin"
   ON articles FOR DELETE
   USING (
-    (select auth.uid()) = author_id OR
+    (
+      (select auth.uid()) = author_id
+      AND status <> 'published'
+    )
+    OR
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'

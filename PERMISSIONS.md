@@ -19,7 +19,7 @@ These policies are the source of truth for what a logged-in user can do in the d
 | Resource | Read (SELECT) | Create (INSERT) | Update | Delete |
 | --- | --- | --- | --- | --- |
 | `profiles` | anyone | user can insert own profile | user can update own profile | not defined |
-| `articles` | anyone | authenticated author (author_id = auth.uid) | author only | author or admin |
+| `articles` | anyone | authenticated author (author_id = auth.uid) | author only | primary author when not published, or admin |
 | `article_versions` | anyone | author of parent article | no policy | no policy |
 | `comments` | anyone | authenticated author | author only | author only |
 | `board_posts` | anyone | admin only | admin only | admin only |
@@ -41,12 +41,12 @@ These are enforced in server loaders/actions. If RLS is stricter, RLS will block
 ### Papers (articles)
 - Create new paper: any authenticated user (`app/routes/papers/new.tsx`).
 - Edit title/description: author or admin (`app/routes/papers/$paperId.edit.tsx`).
-- Delete paper: author or admin (`app/routes/papers/$paperId.tsx`).
+- Delete paper: primary author if paper is not published, or admin (`app/routes/papers/$paperId.tsx`).
 - Submit for review: author only, `draft -> in_review` (`app/routes/papers/$paperId.tsx`).
 - Publish: admin only, `in_review -> published` (`app/routes/papers/$paperId.publish.tsx`).
-- Unpublish: author or admin, `published|in_review -> draft` (`app/routes/papers/$paperId.tsx`).
+- Unpublish: admin only, `published|in_review -> draft` (`app/routes/papers/$paperId.tsx`).
 - Upload new version: author only (`app/routes/papers/$paperId.new-version.tsx`).
-- Delete version: author or admin (`app/routes/papers/$paperId.versions.$versionId.tsx`).
+- Delete version: primary author or admin (final remaining version can be deleted by admin, or by primary author only when paper is not published) (`app/routes/papers/$paperId.versions.$versionId.tsx`).
 - Edit/delete version notes: author or admin (`app/routes/papers/$paperId.versions.$versionId.tsx`).
 - Paper comments (published only): any authenticated user can create.
 - Edit/delete paper comments: comment author or admin (`app/routes/papers/$paperId.tsx`).
