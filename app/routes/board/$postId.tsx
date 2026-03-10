@@ -326,9 +326,6 @@ export default function BoardPost() {
               Posted by <UserLink user={post.author} />
             </span>
             {post.author && <RoleBadge role={post.author.role_type} />}
-            {post.author?.role_type === "admin" && (
-              <span className="pill">Admin</span>
-            )}
             <span className="meta">
               {post.formattedDate}
             </span>
@@ -518,7 +515,7 @@ export default function BoardPost() {
                     </div>
                   </commentFetcher.Form>
                 ) : (
-                  <p className="muted" style={{ margin: 0 }}>
+                  <p className="muted" style={{ margin: 0, whiteSpace: "pre-wrap" }}>
                     {comment.body}
                   </p>
                 )}

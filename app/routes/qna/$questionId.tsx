@@ -355,7 +355,7 @@ export default function QnaDetail() {
                     </div>
                   )}
                 </div>
-                <p className="muted" style={{ margin: 0 }}>
+                <p className="muted" style={{ margin: 0, whiteSpace: "pre-wrap" }}>
                   {reply.content}
                 </p>
                 {(user?.id === reply.author_id || isAdmin) && (

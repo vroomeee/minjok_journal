@@ -1,4 +1,4 @@
-import { Form, redirect, useActionData, useLoaderData, Link, useNavigation } from "react-router";
+import { Form, redirect, useActionData, useLoaderData, Link, useNavigation, useSubmit } from "react-router";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import type { Route } from "./+types/new";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
@@ -168,10 +168,9 @@ export default function NewBoardPost() {
   const { user, profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const submit = useSubmit();
   const formRef = useRef<HTMLFormElement>(null);
   const attachmentsInputRef = useRef<HTMLInputElement>(null);
-  const preuploadedAttachmentsInputRef = useRef<HTMLInputElement>(null);
-  const isForwardedSubmitRef = useRef(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [clientUploadError, setClientUploadError] = useState<string | null>(null);
@@ -221,19 +220,11 @@ export default function NewBoardPost() {
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    if (isForwardedSubmitRef.current) {
-      isForwardedSubmitRef.current = false;
-      return;
-    }
-
     const attachmentsInput = attachmentsInputRef.current;
     const files = pendingAttachments;
 
     if (files.length === 0) {
       setClientUploadError(null);
-      if (preuploadedAttachmentsInputRef.current) {
-        preuploadedAttachmentsInputRef.current.value = "";
-      }
       return;
     }
 
@@ -278,16 +269,23 @@ export default function NewBoardPost() {
       });
     }
 
-    if (preuploadedAttachmentsInputRef.current) {
-      preuploadedAttachmentsInputRef.current.value = JSON.stringify(payloads);
+    const formElement = formRef.current;
+    if (!formElement) {
+      setClientUploadError("Failed to submit form. Please refresh and try again.");
+      setIsUploadingAttachments(false);
+      return;
     }
+
+    const submission = new FormData(formElement);
+    submission.set(BOARD_PREUPLOADED_ATTACHMENTS_FIELD, JSON.stringify(payloads));
+    submission.delete("attachments");
+
     if (attachmentsInput) {
       attachmentsInput.value = "";
     }
     syncAttachmentsInput([]);
-    isForwardedSubmitRef.current = true;
     setIsUploadingAttachments(false);
-    formRef.current?.requestSubmit();
+    submit(submission, { method: "post", encType: "multipart/form-data" });
   }
 
   return (
@@ -323,11 +321,6 @@ export default function NewBoardPost() {
             ref={formRef}
             onSubmit={handleSubmit}
           >
-            <input
-              type="hidden"
-              name={BOARD_PREUPLOADED_ATTACHMENTS_FIELD}
-              ref={preuploadedAttachmentsInputRef}
-            />
             <div>
               <label className="label">Title</label>
               <input
