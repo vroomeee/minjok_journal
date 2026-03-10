@@ -1,5 +1,5 @@
 import { Form, redirect, useActionData, useLoaderData, Link, useNavigation } from "react-router";
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import type { Route } from "./+types/new";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
 import { createSupabaseBrowserClient } from "~/lib/supabase.client";
@@ -7,6 +7,7 @@ import { Nav } from "~/components/nav";
 import {
   BOARD_ATTACHMENTS_BUCKET,
   BOARD_PREUPLOADED_ATTACHMENTS_FIELD,
+  MAX_BOARD_ATTACHMENTS,
   type BoardAttachmentPayload,
   buildBoardAttachmentPendingPath,
   buildBoardAttachmentPath,
@@ -170,14 +171,63 @@ export default function NewBoardPost() {
   const formRef = useRef<HTMLFormElement>(null);
   const attachmentsInputRef = useRef<HTMLInputElement>(null);
   const preuploadedAttachmentsInputRef = useRef<HTMLInputElement>(null);
+  const isForwardedSubmitRef = useRef(false);
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [clientUploadError, setClientUploadError] = useState<string | null>(null);
   const isSubmitting = navigation.state === "submitting";
   const submitError = clientUploadError || actionData?.error;
 
+  function syncAttachmentsInput(files: File[]) {
+    const input = attachmentsInputRef.current;
+    if (!input || typeof DataTransfer === "undefined") return;
+
+    const dataTransfer = new DataTransfer();
+    files.forEach((file) => dataTransfer.items.add(file));
+    input.files = dataTransfer.files;
+  }
+
+  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = event.currentTarget.files ? Array.from(event.currentTarget.files) : [];
+    event.currentTarget.value = "";
+    if (selectedFiles.length === 0) return;
+
+    const nextAttachments = [...pendingAttachments, ...selectedFiles].filter(
+      (file, index, allFiles) =>
+        allFiles.findIndex(
+          (candidate) =>
+            candidate.name === file.name &&
+            candidate.size === file.size &&
+            candidate.lastModified === file.lastModified,
+        ) === index,
+    );
+    const validationError = validateBoardAttachmentFiles(nextAttachments);
+    if (validationError) {
+      setClientUploadError(validationError);
+      syncAttachmentsInput(pendingAttachments);
+      return;
+    }
+
+    setClientUploadError(null);
+    setPendingAttachments(nextAttachments);
+    syncAttachmentsInput(nextAttachments);
+  }
+
+  function handleRemovePendingAttachment(indexToRemove: number) {
+    const nextAttachments = pendingAttachments.filter((_, index) => index !== indexToRemove);
+    setPendingAttachments(nextAttachments);
+    setClientUploadError(null);
+    syncAttachmentsInput(nextAttachments);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (isForwardedSubmitRef.current) {
+      isForwardedSubmitRef.current = false;
+      return;
+    }
+
     const attachmentsInput = attachmentsInputRef.current;
-    const files = attachmentsInput?.files ? Array.from(attachmentsInput.files) : [];
+    const files = pendingAttachments;
 
     if (files.length === 0) {
       setClientUploadError(null);
@@ -234,6 +284,8 @@ export default function NewBoardPost() {
     if (attachmentsInput) {
       attachmentsInput.value = "";
     }
+    syncAttachmentsInput([]);
+    isForwardedSubmitRef.current = true;
     setIsUploadingAttachments(false);
     formRef.current?.requestSubmit();
   }
@@ -309,11 +361,56 @@ export default function NewBoardPost() {
                 multiple
                 className="input"
                 ref={attachmentsInputRef}
+                onChange={handleAttachmentChange}
                 disabled={isUploadingAttachments || isSubmitting}
               />
               <p className="muted text-sm" style={{ marginTop: 6 }}>
-                Up to 10 files, max 50 MB per file.
+                {pendingAttachments.length}/{MAX_BOARD_ATTACHMENTS} selected. Max 50 MB per file.
               </p>
+              {pendingAttachments.length > 0 && (
+                <div className="row" style={{ marginTop: 8, gap: 8, flexWrap: "wrap" }}>
+                  {pendingAttachments.map((file, index) => (
+                    <span
+                      key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        border: "1px solid var(--border)",
+                        background: "var(--surface-2)",
+                        maxWidth: 320,
+                      }}
+                    >
+                      <span
+                        className="text-sm"
+                        style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        title={file.name}
+                      >
+                        {file.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePendingAttachment(index)}
+                        aria-label={`Remove ${file.name}`}
+                        disabled={isUploadingAttachments || isSubmitting}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          color: "var(--muted)",
+                          padding: 0,
+                          cursor: "pointer",
+                          fontSize: 14,
+                          lineHeight: 1,
+                        }}
+                      >
+                        x
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="row">
