@@ -222,13 +222,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (allPaths.length > 0) {
         await supabase.storage.from("articles").remove(allPaths);
       }
-      const { error: deleteCommentsError } = await db
-        .from("comments")
-        .delete()
-        .eq("article_id", paperId);
-      if (deleteCommentsError)
-        return { error: "Failed to delete paper comments" };
-
       const { error: deleteArticleError } = await db
         .from("articles")
         .delete()
@@ -249,13 +242,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     const fallbackVersion = versions.find((v) => v.id !== versionId);
     if (!fallbackVersion)
       return { error: "Could not determine fallback version" };
-
-    const { error: deleteCommentsError } = await db
-      .from("comments")
-      .delete()
-      .eq("version_id", versionId);
-    if (deleteCommentsError)
-      return { error: "Failed to delete comments for this version" };
 
     if (targetPath.length > 0) {
       await supabase.storage.from("articles").remove(targetPath);
