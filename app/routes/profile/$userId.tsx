@@ -76,9 +76,14 @@ export default function ProfilePage() {
               </div>
             </div>
             {isOwnProfile && (
-              <Link to={`/profile/${profile.id}/edit`} className="btn btn-ghost">
-                Edit Profile
-              </Link>
+              <div className="row" style={{ gap: 8 }}>
+                <Link to={`/profile/${profile.id}/edit`} className="btn btn-ghost">
+                  Edit Profile
+                </Link>
+                <Link to="/auth/reset-password" className="btn btn-ghost">
+                  Change Password
+                </Link>
+              </div>
             )}
           </div>
 
