@@ -19,16 +19,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     requestUrl.searchParams.get("token") ||
     requestUrl.searchParams.get("code");
   const type = (requestUrl.searchParams.get("type") as EmailOtpType | null) || "signup";
-  const _next = requestUrl.searchParams.get("next");
-  const next = _next?.startsWith("/") ? _next : "/";
+  const requestedNext = requestUrl.searchParams.get("next");
+  const next = requestedNext?.startsWith("/") ? requestedNext : undefined;
 
   const { supabase, headers } = createSupabaseServerClient(request);
 
-  async function resolveTarget() {
+  async function resolveTarget(flowType: EmailOtpType | null = type) {
+    if (next) return next;
+    if (flowType === "recovery") return "/auth/reset-password";
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (next) return next;
     if (user?.id) return `/profile/${user.id}`;
     return "/";
   }
@@ -100,6 +102,7 @@ export default function ConfirmPage() {
       }
 
       if (access_token && refresh_token) {
+        const hashType = hashParams.get("type") as EmailOtpType | null;
         const supabase = createSupabaseBrowserClient();
         const { error: sessionError } = await supabase.auth.setSession({
           access_token,
@@ -119,7 +122,11 @@ export default function ConfirmPage() {
         const { data: userData } = await supabase.auth.getUser();
         const target =
           data?.next ||
-          (userData?.user?.id ? `/profile/${userData.user.id}` : "/");
+          (hashType === "recovery"
+            ? "/auth/reset-password"
+            : userData?.user?.id
+              ? `/profile/${userData.user.id}`
+              : "/");
 
         if (!active) return;
         navigate(target, { replace: true });
