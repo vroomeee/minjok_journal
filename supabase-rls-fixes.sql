@@ -63,6 +63,16 @@ DROP POLICY IF EXISTS "board_posts_delete_admin" ON board_posts;
 DROP POLICY IF EXISTS "board_posts_select" ON board_posts;
 DROP POLICY IF EXISTS "board_posts_select_public" ON board_posts;
 
+-- Board post attachments
+DROP POLICY IF EXISTS "Board attachments are viewable by everyone" ON board_post_attachments;
+DROP POLICY IF EXISTS "Only admins can create board attachments" ON board_post_attachments;
+DROP POLICY IF EXISTS "Only admins can update board attachments" ON board_post_attachments;
+DROP POLICY IF EXISTS "Only admins can delete board attachments" ON board_post_attachments;
+DROP POLICY IF EXISTS "board_post_attachments_select_public" ON board_post_attachments;
+DROP POLICY IF EXISTS "board_post_attachments_admin_insert" ON board_post_attachments;
+DROP POLICY IF EXISTS "board_post_attachments_admin_update" ON board_post_attachments;
+DROP POLICY IF EXISTS "board_post_attachments_admin_delete" ON board_post_attachments;
+
 -- Q&A
 DROP POLICY IF EXISTS "Questions are viewable by everyone" ON qna_questions;
 DROP POLICY IF EXISTS "Authenticated users can ask questions" ON qna_questions;
@@ -307,6 +317,44 @@ CREATE POLICY "board_posts_admin_update"
 
 CREATE POLICY "board_posts_admin_delete"
   ON board_posts FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+-- Board post attachments
+CREATE POLICY "board_post_attachments_select_public"
+  ON board_post_attachments FOR SELECT
+  USING (true);
+
+CREATE POLICY "board_post_attachments_admin_insert"
+  ON board_post_attachments FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "board_post_attachments_admin_update"
+  ON board_post_attachments FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.id = (select auth.uid()) AND p.role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "board_post_attachments_admin_delete"
+  ON board_post_attachments FOR DELETE
   USING (
     EXISTS (
       SELECT 1 FROM profiles p

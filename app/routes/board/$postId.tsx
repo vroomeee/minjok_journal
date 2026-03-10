@@ -14,6 +14,7 @@ import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef, useState } from "react";
 import { UserLink } from "~/components/user-link";
 import type { Database } from "~/lib/database.types";
+import { BOARD_ATTACHMENTS_BUCKET } from "~/lib/board-attachments";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -27,13 +28,20 @@ function formatDate(dateStr: string | null): string {
   return dateFmt.format(new Date(dateStr));
 }
 
+function formatFileSize(sizeInBytes: number | null) {
+  if (!sizeInBytes || sizeInBytes <= 0) return "Unknown size";
+  if (sizeInBytes < 1024) return `${sizeInBytes} B`;
+  if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(1)} KB`;
+  return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 type CommentInsert = Database["public"]["Tables"]["comments"]["Insert"];
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const { postId } = params;
 
-  const [postResult, commentsResult] = await Promise.all([
+  const [postResult, commentsResult, attachmentsResult] = await Promise.all([
     supabase
       .from("board_posts")
       .select(
@@ -66,10 +74,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       .eq("comment_type", "board")
       .is("parent_id", null)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("board_post_attachments")
+      .select("*")
+      .eq("board_post_id", postId)
+      .order("created_at", { ascending: true }),
   ]);
 
   const { data: post, error } = postResult;
   const { data: comments } = commentsResult;
+  const { data: attachments } = attachmentsResult;
 
   if (error || !post) throw new Response("Post not found", { status: 404 });
 
@@ -78,10 +92,23 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     ...c,
     formattedDate: formatDate(c.created_at),
   }));
+  const formattedAttachments = (attachments || []).map((attachment) => {
+    const {
+      data: { publicUrl },
+    } = supabase.storage
+      .from(BOARD_ATTACHMENTS_BUCKET)
+      .getPublicUrl(attachment.storage_path, { download: attachment.file_name });
+
+    return {
+      ...attachment,
+      downloadUrl: publicUrl,
+    };
+  });
 
   return {
     post: formattedPost,
     comments: formattedComments,
+    attachments: formattedAttachments,
   };
 }
 
@@ -113,6 +140,28 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     if (!post || (post.author_id !== user.id && !isAdmin)) {
       return { error: "Unauthorized to delete this post" };
+    }
+
+    const { data: attachments } = await supabase
+      .from("board_post_attachments")
+      .select("storage_path")
+      .eq("board_post_id", postId);
+
+    const attachmentPaths = Array.from(
+      new Set(
+        (attachments || [])
+          .map((attachment) => attachment.storage_path)
+          .filter((path): path is string => Boolean(path)),
+      ),
+    );
+
+    if (attachmentPaths.length > 0) {
+      const { error: removeStorageError } = await supabase.storage
+        .from(BOARD_ATTACHMENTS_BUCKET)
+        .remove(attachmentPaths);
+      if (removeStorageError) {
+        return { error: "Failed to remove one or more attachment files. Delete aborted." };
+      }
     }
 
     const { error } = await supabase
@@ -202,7 +251,7 @@ export default function BoardPost() {
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
   const revalidator = useRevalidator();
 
-  const { post, comments } = useLoaderData<typeof loader>();
+  const { post, comments, attachments } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as {
     user?: { id: string };
     profile?: { role_type?: string | null };
@@ -292,6 +341,25 @@ export default function BoardPost() {
               {post.content}
             </p>
           </div>
+
+          {attachments.length > 0 && (
+            <div className="section-compact" style={{ marginTop: 10 }}>
+              <h2 style={{ fontSize: 16, margin: "0 0 8px" }}>Attachments</h2>
+              <div className="list" style={{ gap: 6 }}>
+                {attachments.map((attachment) => (
+                  <a
+                    key={attachment.id}
+                    href={attachment.downloadUrl}
+                    className="nav-link"
+                    style={{ padding: 0, display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span>{attachment.file_name}</span>
+                    <span className="meta">({formatFileSize(attachment.file_size)})</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="section">

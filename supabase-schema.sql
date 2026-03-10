@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS board_posts (
   author_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL
 );
 
+-- Board post attachments table
+CREATE TABLE IF NOT EXISTS board_post_attachments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  board_post_id UUID REFERENCES board_posts(id) ON DELETE CASCADE NOT NULL,
+  file_name TEXT NOT NULL,
+  file_size BIGINT NOT NULL,
+  content_type TEXT,
+  storage_path TEXT NOT NULL
+);
+
 -- Q&A questions table
 CREATE TABLE IF NOT EXISTS qna_questions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -108,6 +120,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_article ON comments(article_id);
 CREATE INDEX IF NOT EXISTS idx_comments_version ON comments(version_id);
 CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
 CREATE INDEX IF NOT EXISTS idx_comments_type ON comments(comment_type);
+CREATE INDEX IF NOT EXISTS idx_board_post_attachments_post_id ON board_post_attachments(board_post_id);
 CREATE INDEX IF NOT EXISTS idx_qna_questions_author ON qna_questions(author_id);
 CREATE INDEX IF NOT EXISTS idx_qna_replies_question ON qna_replies(question_id);
 
@@ -119,6 +132,7 @@ ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE article_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE board_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE board_post_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qna_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qna_replies ENABLE ROW LEVEL SECURITY;
 
@@ -206,6 +220,32 @@ CREATE POLICY "Only admins can delete board posts"
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
   );
 
+-- Board attachments: Public read, admin-only write
+CREATE POLICY "board_post_attachments_select_public"
+  ON board_post_attachments FOR SELECT
+  USING (true);
+
+CREATE POLICY "board_post_attachments_admin_insert"
+  ON board_post_attachments FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
+  );
+
+CREATE POLICY "board_post_attachments_admin_update"
+  ON board_post_attachments FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
+  );
+
+CREATE POLICY "board_post_attachments_admin_delete"
+  ON board_post_attachments FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin')
+  );
+
 -- Q&A Questions: Public read, authenticated write
 CREATE POLICY "Questions are viewable by everyone"
   ON qna_questions FOR SELECT
@@ -263,6 +303,42 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Function to remove board comments when a board post is deleted
+CREATE OR REPLACE FUNCTION public.delete_board_post_comments()
+RETURNS TRIGGER AS $$
+BEGIN
+  DELETE FROM public.comments
+  WHERE comment_type = 'board'
+    AND article_id = OLD.id;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_catalog;
+
+-- Trigger for board post -> board comments cleanup
+DROP TRIGGER IF EXISTS delete_board_comments_on_post_delete ON public.board_posts;
+CREATE TRIGGER delete_board_comments_on_post_delete
+  AFTER DELETE ON public.board_posts
+  FOR EACH ROW EXECUTE FUNCTION public.delete_board_post_comments();
+
+-- Function to remove article comments when an article is deleted
+CREATE OR REPLACE FUNCTION public.delete_article_comments_for_article()
+RETURNS TRIGGER AS $$
+BEGIN
+  DELETE FROM public.comments
+  WHERE comment_type = 'article'
+    AND article_id = OLD.id;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_catalog;
+
+-- Trigger for article -> article comments cleanup
+DROP TRIGGER IF EXISTS delete_article_comments_on_article_delete ON public.articles;
+CREATE TRIGGER delete_article_comments_on_article_delete
+  AFTER DELETE ON public.articles
+  FOR EACH ROW EXECUTE FUNCTION public.delete_article_comments_for_article();
+
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -290,6 +366,49 @@ CREATE TRIGGER update_qna_questions_updated_at BEFORE UPDATE ON qna_questions
 
 CREATE TRIGGER update_qna_replies_updated_at BEFORE UPDATE ON qna_replies
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Storage bucket for board attachments
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('board-attachments', 'board-attachments', true)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name, public = EXCLUDED.public;
+
+CREATE POLICY "board_attachments_select_public"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'board-attachments');
+
+CREATE POLICY "board_attachments_admin_insert"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'board-attachments'
+    AND EXISTS (
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "board_attachments_admin_update"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'board-attachments'
+    AND EXISTS (
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin'
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'board-attachments'
+    AND EXISTS (
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin'
+    )
+  );
+
+CREATE POLICY "board_attachments_admin_delete"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'board-attachments'
+    AND EXISTS (
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND role_type = 'admin'
+    )
+  );
 
 -- Storage bucket for article files
 -- Note: Create this in the Supabase Dashboard Storage section or via SQL:

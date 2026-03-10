@@ -205,6 +205,44 @@ export type Database = {
           },
         ];
       };
+      board_post_attachments: {
+        Row: {
+          board_post_id: string;
+          content_type: string | null;
+          created_at: string | null;
+          file_name: string;
+          file_size: number;
+          id: string;
+          storage_path: string;
+        };
+        Insert: {
+          board_post_id: string;
+          content_type?: string | null;
+          created_at?: string | null;
+          file_name: string;
+          file_size: number;
+          id?: string;
+          storage_path: string;
+        };
+        Update: {
+          board_post_id?: string;
+          content_type?: string | null;
+          created_at?: string | null;
+          file_name?: string;
+          file_size?: number;
+          id?: string;
+          storage_path?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "board_post_attachments_board_post_id_fkey";
+            columns: ["board_post_id"];
+            isOneToOne: false;
+            referencedRelation: "board_posts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       comments: {
         Row: {
           article_id: string;
