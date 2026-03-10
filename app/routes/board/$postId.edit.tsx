@@ -1,12 +1,17 @@
-import { Form, redirect, useActionData, useLoaderData, Link } from "react-router";
+import { Form, redirect, useActionData, useLoaderData, Link, useNavigation } from "react-router";
+import { useRef, useState, type FormEvent } from "react";
 import type { Route } from "./+types/$postId.edit";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
+import { createSupabaseBrowserClient } from "~/lib/supabase.client";
 import { Nav } from "~/components/nav";
 import {
   BOARD_ATTACHMENTS_BUCKET,
+  BOARD_PREUPLOADED_ATTACHMENTS_FIELD,
   MAX_BOARD_ATTACHMENTS,
+  type BoardAttachmentPayload,
   buildBoardAttachmentPath,
   normalizeBoardAttachmentFiles,
+  parseBoardAttachmentPayload,
   validateBoardAttachmentFiles,
 } from "~/lib/board-attachments";
 
@@ -97,6 +102,19 @@ export async function action({ request, params }: Route.ActionArgs) {
         .filter(Boolean),
     ),
   );
+  const parsedAttachmentPayload = parseBoardAttachmentPayload(
+    formData.get(BOARD_PREUPLOADED_ATTACHMENTS_FIELD),
+  );
+  if (parsedAttachmentPayload.error) {
+    return { error: parsedAttachmentPayload.error };
+  }
+  const preuploadedAttachments = parsedAttachmentPayload.payloads;
+  const hasInvalidAttachmentPath = preuploadedAttachments.some(
+    (attachment) => !attachment.storage_path.startsWith(`${user.id}/board/`),
+  );
+  if (hasInvalidAttachmentPath) {
+    return { error: "Invalid attachment path." };
+  }
   const newAttachmentFiles = normalizeBoardAttachmentFiles(formData.getAll("attachments"));
 
   if (!title || !content) {
@@ -126,7 +144,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const projectedAttachmentCount =
-    (existingAttachments || []).length - removableAttachments.length + newAttachmentFiles.length;
+    (existingAttachments || []).length -
+    removableAttachments.length +
+    newAttachmentFiles.length +
+    preuploadedAttachments.length;
   if (projectedAttachmentCount > MAX_BOARD_ATTACHMENTS) {
     return { error: `A post can have at most ${MAX_BOARD_ATTACHMENTS} attachments.` };
   }
@@ -158,15 +179,23 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  if (newAttachmentFiles.length > 0) {
-    const uploadedPaths: string[] = [];
+  if (newAttachmentFiles.length > 0 || preuploadedAttachments.length > 0) {
+    const uploadedPaths = Array.from(
+      new Set(preuploadedAttachments.map((attachment) => attachment.storage_path).filter(Boolean)),
+    );
     const newAttachmentRows: {
       board_post_id: string;
       file_name: string;
       file_size: number;
       content_type: string | null;
       storage_path: string;
-    }[] = [];
+    }[] = preuploadedAttachments.map((attachment) => ({
+      board_post_id: postId,
+      file_name: attachment.file_name,
+      file_size: attachment.file_size,
+      content_type: attachment.content_type,
+      storage_path: attachment.storage_path,
+    }));
 
     for (let idx = 0; idx < newAttachmentFiles.length; idx += 1) {
       const file = newAttachmentFiles[idx];
@@ -180,7 +209,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         if (uploadedPaths.length > 0) {
           await supabase.storage.from(BOARD_ATTACHMENTS_BUCKET).remove(uploadedPaths);
         }
-        return { error: `Post updated, but failed to upload attachment "${file.name}".` };
+        return { error: `Post updated, but failed to upload attachment "${file.name}": ${uploadError.message}` };
       }
 
       uploadedPaths.push(path);
@@ -201,7 +230,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (uploadedPaths.length > 0) {
         await supabase.storage.from(BOARD_ATTACHMENTS_BUCKET).remove(uploadedPaths);
       }
-      return { error: "Post updated, but failed to save attachment metadata." };
+      return {
+        error: `Post updated, but failed to save attachment metadata: ${insertAttachmentError.message}`,
+      };
     }
   }
 
@@ -211,6 +242,77 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function EditBoardPost() {
   const { post, user, profile, attachments } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const formRef = useRef<HTMLFormElement>(null);
+  const attachmentsInputRef = useRef<HTMLInputElement>(null);
+  const preuploadedAttachmentsInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [clientUploadError, setClientUploadError] = useState<string | null>(null);
+  const isSubmitting = navigation.state === "submitting";
+  const submitError = clientUploadError || actionData?.error;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const attachmentsInput = attachmentsInputRef.current;
+    const files = attachmentsInput?.files ? Array.from(attachmentsInput.files) : [];
+
+    if (files.length === 0) {
+      setClientUploadError(null);
+      if (preuploadedAttachmentsInputRef.current) {
+        preuploadedAttachmentsInputRef.current.value = "";
+      }
+      return;
+    }
+
+    event.preventDefault();
+    setClientUploadError(null);
+
+    const validationError = validateBoardAttachmentFiles(files);
+    if (validationError) {
+      setClientUploadError(validationError);
+      return;
+    }
+
+    setIsUploadingAttachments(true);
+
+    const supabase = createSupabaseBrowserClient();
+    const uploadedPaths: string[] = [];
+    const payloads: BoardAttachmentPayload[] = [];
+
+    for (let idx = 0; idx < files.length; idx += 1) {
+      const file = files[idx];
+      const path = buildBoardAttachmentPath(user.id, post.id, file.name, idx);
+
+      const { error: uploadError } = await supabase.storage
+        .from(BOARD_ATTACHMENTS_BUCKET)
+        .upload(path, file, { contentType: file.type || undefined });
+
+      if (uploadError) {
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from(BOARD_ATTACHMENTS_BUCKET).remove(uploadedPaths);
+        }
+        setClientUploadError(`Failed to upload attachment "${file.name}": ${uploadError.message}`);
+        setIsUploadingAttachments(false);
+        return;
+      }
+
+      uploadedPaths.push(path);
+      payloads.push({
+        file_name: file.name,
+        file_size: file.size,
+        content_type: file.type || null,
+        storage_path: path,
+      });
+    }
+
+    if (preuploadedAttachmentsInputRef.current) {
+      preuploadedAttachmentsInputRef.current.value = JSON.stringify(payloads);
+    }
+    if (attachmentsInput) {
+      attachmentsInput.value = "";
+    }
+    setIsUploadingAttachments(false);
+    formRef.current?.requestSubmit();
+  }
 
   return (
     <div className="page">
@@ -230,15 +332,26 @@ export default function EditBoardPost() {
             </Link>
           </div>
 
-          {actionData?.error && (
+          {submitError && (
             <div className="section-compact subtle" style={{ marginBottom: 10 }}>
               <p className="text-sm" style={{ color: "#f6b8bd" }}>
-                {actionData.error}
+                {submitError}
               </p>
             </div>
           )}
 
-          <Form method="post" encType="multipart/form-data" className="list">
+          <Form
+            method="post"
+            encType="multipart/form-data"
+            className="list"
+            ref={formRef}
+            onSubmit={handleSubmit}
+          >
+            <input
+              type="hidden"
+              name={BOARD_PREUPLOADED_ATTACHMENTS_FIELD}
+              ref={preuploadedAttachmentsInputRef}
+            />
             <div>
               <label className="label">Title</label>
               <input
@@ -292,15 +405,31 @@ export default function EditBoardPost() {
               <label className="label" htmlFor="attachments">
                 Add Attachments
               </label>
-              <input id="attachments" type="file" name="attachments" multiple className="input" />
+              <input
+                id="attachments"
+                type="file"
+                name="attachments"
+                multiple
+                className="input"
+                ref={attachmentsInputRef}
+                disabled={isUploadingAttachments || isSubmitting}
+              />
               <p className="muted text-sm" style={{ marginTop: 6 }}>
                 Up to 10 files total per post, max 50 MB per file.
               </p>
             </div>
 
             <div className="row">
-              <button type="submit" className="btn btn-accent">
-                Save
+              <button
+                type="submit"
+                className="btn btn-accent"
+                disabled={isUploadingAttachments || isSubmitting}
+              >
+                {isUploadingAttachments
+                  ? "Uploading attachments..."
+                  : isSubmitting
+                    ? "Saving..."
+                    : "Save"}
               </button>
               <Link to={`/board/${post.id}`} className="btn btn-ghost">
                 Cancel
