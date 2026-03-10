@@ -125,12 +125,19 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     paper.versions?.[0] ||
     null;
 
-  let publishedFileUrl: string | null = null;
+  let publishedFileViewUrl: string | null = null;
+  let publishedFileDownloadUrl: string | null = null;
   if (publishedVersion?.storage_path) {
-    const { data: urlData } = supabase.storage
+    const { data: viewUrlData } = supabase.storage
       .from("articles")
       .getPublicUrl(publishedVersion.storage_path);
-    publishedFileUrl = urlData.publicUrl;
+    const { data: downloadUrlData } = supabase.storage
+      .from("articles")
+      .getPublicUrl(publishedVersion.storage_path, {
+        download: publishedVersion.file_name,
+      });
+    publishedFileViewUrl = viewUrlData.publicUrl;
+    publishedFileDownloadUrl = downloadUrlData.publicUrl;
   }
 
   const formattedPaper = {
@@ -151,7 +158,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     comments: formattedComments,
     activeVersionId,
     publishedVersion,
-    publishedFileUrl,
+    publishedFileViewUrl,
+    publishedFileDownloadUrl,
   };
 }
 
@@ -412,7 +420,8 @@ export default function PaperDetail() {
     comments,
     activeVersionId,
     publishedVersion,
-    publishedFileUrl,
+    publishedFileViewUrl,
+    publishedFileDownloadUrl,
   } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as {
     user?: { id: string };
@@ -654,9 +663,9 @@ export default function PaperDetail() {
                   {publishedVersion.version_number})
                 </p>
               </div>
-              {publishedFileUrl && (
+              {publishedFileDownloadUrl && (
                 <a
-                  href={publishedFileUrl}
+                  href={publishedFileDownloadUrl}
                   className="btn btn-ghost"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -665,11 +674,11 @@ export default function PaperDetail() {
                 </a>
               )}
             </div>
-            {publishedFileUrl &&
+            {publishedFileViewUrl &&
               publishedVersion.file_name.toLowerCase().endsWith(".pdf") && (
                 <div style={{ marginTop: 12 }}>
                   <iframe
-                    src={publishedFileUrl}
+                    src={publishedFileViewUrl}
                     className="w-full"
                     style={{
                       height: 520,

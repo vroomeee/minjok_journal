@@ -79,10 +79,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Version not found", { status: 404 });
   }
 
-  const { data: urlData } = supabase.storage
+  const { data: viewUrlData } = supabase.storage
     .from("articles")
     .getPublicUrl(version.storage_path);
-  const fileUrl = urlData.publicUrl;
+  const { data: downloadUrlData } = supabase.storage
+    .from("articles")
+    .getPublicUrl(version.storage_path, { download: version.file_name });
+  const fileViewUrl = viewUrlData.publicUrl;
+  const fileDownloadUrl = downloadUrlData.publicUrl;
 
   const { data: comments } = await supabase
     .from("comments")
@@ -141,7 +145,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return {
     paper,
     version: formattedVersion,
-    fileUrl,
+    fileViewUrl,
+    fileDownloadUrl,
     comments: formattedComments,
     replies: formattedReplies,
     totalVersions: versionList?.length || 0,
@@ -451,7 +456,8 @@ export default function VersionReview() {
   const {
     paper,
     version,
-    fileUrl,
+    fileViewUrl,
+    fileDownloadUrl,
     comments,
     replies,
     totalVersions,
@@ -627,7 +633,7 @@ export default function VersionReview() {
 
           <div className="row" style={{ gap: 10, marginTop: 12 }}>
             <a
-              href={fileUrl}
+              href={fileDownloadUrl}
               className="btn btn-accent"
               target="_blank"
               rel="noopener noreferrer"
@@ -639,7 +645,7 @@ export default function VersionReview() {
           {version.file_name.toLowerCase().endsWith(".pdf") && (
             <div style={{ marginTop: 12 }}>
               <iframe
-                src={fileUrl}
+                src={fileViewUrl}
                 className="w-full"
                 style={{
                   height: 520,
