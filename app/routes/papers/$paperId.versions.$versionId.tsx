@@ -304,10 +304,19 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Version not found" };
     }
 
+    const originalPath = targetVersion.storage_path;
+    const lastSlashIndex = originalPath.lastIndexOf("/");
+    const parentPath =
+      lastSlashIndex >= 0 ? originalPath.slice(0, lastSlashIndex) : "";
+    // Use a new object path on each replacement so the stored filename updates and caches are busted.
+    const replacementPath = parentPath
+      ? `${parentPath}/${Date.now()}-${replacementFile.name}`
+      : `${Date.now()}-${replacementFile.name}`;
+
     const storageClient = adminClient?.supabase || supabase;
     const { error: uploadError } = await storageClient.storage
       .from("articles")
-      .upload(targetVersion.storage_path, replacementFile, {
+      .upload(replacementPath, replacementFile, {
         upsert: true,
         contentType: replacementFile.type || undefined,
       });
@@ -330,6 +339,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const { error: updateVersionError } = await db
       .from("article_versions")
       .update({
+        storage_path: replacementPath,
         file_name: replacementFile.name,
         file_size: replacementFile.size,
       })
@@ -337,6 +347,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       .eq("article_id", paperId);
 
     if (updateVersionError) {
+      await storageClient.storage.from("articles").remove([replacementPath]);
       if (!adminClient) {
         return {
           error:
@@ -350,6 +361,10 @@ export async function action({ request, params }: Route.ActionArgs) {
           "File was replaced in storage, but updating version metadata failed: " +
           updateVersionError.message,
       };
+    }
+
+    if (replacementPath !== originalPath) {
+      await storageClient.storage.from("articles").remove([originalPath]);
     }
 
     return redirect(`/papers/${paperId}/versions/${versionId}`);
