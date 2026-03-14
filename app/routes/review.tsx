@@ -1,6 +1,8 @@
 import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/review";
 import { createSupabaseServerClient, getUserAndProfile } from "~/lib/supabase.server";
+import { createSignedArticleUrl } from "~/lib/article-files.server";
+import { isReviewRole } from "~/lib/roles";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { AuthorList } from "~/components/author-list";
@@ -22,14 +24,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { user, profile } = await getUserAndProfile(request);
 
-  // Redirect if user is not logged in or is not a mentor or prof
-  if (
-    !user ||
-    !profile ||
-    (profile.role_type !== "mentor" &&
-      profile.role_type !== "admin" &&
-      profile.role_type !== "prof")
-  ) {
+  if (!user || !profile || !isReviewRole(profile.role_type)) {
     return redirect("/");
   }
 
@@ -50,17 +45,47 @@ export async function loader({ request }: Route.LoaderArgs) {
       current_version:article_versions!current_version_id (
         id,
         version_number,
-        created_at
+        created_at,
+        file_name,
+        storage_path,
+        blind_file_name,
+        blind_storage_path
       )
     `
     )
     .eq("status", "in_review")
     .order("updated_at", { ascending: false });
 
-  const formattedPapers = (papers || []).map((paper) => ({
-    ...paper,
-    formattedDate: formatDate(paper.updated_at),
-  }));
+  const formattedPapers = await Promise.all(
+    (papers || []).map(async (paper) => {
+      const copyrightDownloadUrl =
+        paper.copyright_storage_path && paper.copyright_file_name
+          ? await createSignedArticleUrl(paper.copyright_storage_path, {
+              download: paper.copyright_file_name,
+            })
+          : null;
+      const reviewLabel =
+        profile.role_type === "prof"
+          ? "Review Blinded File"
+          : "Review Original File";
+      const hasReviewFile =
+        profile.role_type === "prof"
+          ? Boolean(
+              paper.current_version?.blind_storage_path ||
+                paper.current_version?.storage_path,
+            )
+          : Boolean(paper.current_version?.storage_path);
+
+      return {
+        ...paper,
+        formattedDate: formatDate(paper.updated_at),
+        reviewLabel,
+        hasReviewFile,
+        hasCopyrightConsent: Boolean(paper.copyright_storage_path),
+        copyrightDownloadUrl,
+      };
+    }),
+  );
 
   return { papers: formattedPapers, user, profile };
 }
@@ -123,13 +148,33 @@ export default function ReviewQueue() {
                       </span>
                     </div>
                     {paper.current_version && (
-                      <div style={{ marginTop: 6 }}>
-                        <Link
-                          to={`/papers/${paper.id}/versions/${paper.current_version.id}`}
-                          className="btn btn-ghost"
-                        >
-                          Review Version {paper.current_version.version_number}
-                        </Link>
+                      <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                        {paper.hasReviewFile ? (
+                          <Link
+                            to={`/papers/${paper.id}/versions/${paper.current_version.id}`}
+                            className="btn btn-ghost"
+                          >
+                            {paper.reviewLabel}
+                          </Link>
+                        ) : (
+                          <span className="muted" style={{ fontSize: 13 }}>
+                            Review file missing
+                          </span>
+                        )}
+                        {paper.copyrightDownloadUrl ? (
+                          <a
+                            href={paper.copyrightDownloadUrl}
+                            className="btn btn-ghost"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Copyright Consent
+                          </a>
+                        ) : (
+                          <span className="muted" style={{ fontSize: 13 }}>
+                            Copyright consent missing
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

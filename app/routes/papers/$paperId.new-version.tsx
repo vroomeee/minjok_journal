@@ -5,7 +5,18 @@ import {
   createSupabaseAdminClient,
   createSupabaseServerClient,
 } from "~/lib/supabase.server";
-import { isEnglishFileName } from "~/lib/file-names";
+import {
+  ARTICLE_FILE_ACCEPT,
+  getOptionalFormFile,
+  validateArticleUpload,
+} from "~/lib/article-files";
+import {
+  buildBlindArticlePath,
+  buildCopyrightArticlePath,
+  buildOriginalArticlePath,
+  removeArticleFiles,
+  uploadArticleFile,
+} from "~/lib/article-files.server";
 import { Nav } from "~/components/nav";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -28,6 +39,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       status: 403,
     });
   }
+  if (paper.status === "published") {
+    return redirect(`/papers/${paper.id}`);
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -44,7 +58,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const nextVersionNumber = versions && versions.length > 0 ? versions[0].version_number + 1 : 1;
 
-  return { paper, nextVersionNumber, user, profile };
+  return {
+    paper,
+    nextVersionNumber,
+    user,
+    profile,
+    hasCopyrightConsent: Boolean(paper.copyright_storage_path),
+    copyrightFileName: paper.copyright_file_name,
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -56,18 +77,28 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const formData = await request.formData();
   const notes = formData.get("notes") as string;
-  const file = formData.get("file") as File;
+  const originalFile = getOptionalFormFile(formData, "originalFile");
+  const blindFile = getOptionalFormFile(formData, "blindFile");
+  const copyrightFile = getOptionalFormFile(formData, "copyrightFile");
 
-  if (!file) return { error: "File is required" };
-  if (!isEnglishFileName(file.name)) {
-    return {
-      error:
-        "File name must only use English letters, numbers, dots, hyphens, or underscores (spaces are not allowed).",
-    };
+  const originalValidation = validateArticleUpload(originalFile, "Original file");
+  if (originalValidation) {
+    return { error: originalValidation };
   }
 
-  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
-  if (file.size > MAX_FILE_SIZE) return { error: "File too large. Maximum size is 100 MB." };
+  const blindValidation = validateArticleUpload(blindFile, "Blinded file");
+  if (blindValidation) {
+    return { error: blindValidation };
+  }
+
+  const copyrightValidation = validateArticleUpload(
+    copyrightFile,
+    "Copyright consent",
+    { required: false },
+  );
+  if (copyrightValidation) {
+    return { error: copyrightValidation };
+  }
 
   // Throttle duplicate uploads: limit to one version upload every 5 seconds per user.
   const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
@@ -86,7 +117,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("author_id, authors:article_authors(profile_id)")
+    .select(
+      "author_id, status, copyright_storage_path, authors:article_authors(profile_id)",
+    )
     .eq("id", paperId)
     .single();
 
@@ -94,6 +127,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     paper?.author_id === user.id ||
     paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
   if (!paper || !isAuthor) throw new Response("Unauthorized", { status: 403 });
+  if (paper.status === "published") {
+    return { error: "Published papers cannot receive new versions." };
+  }
 
   const { data: versions } = await supabase
     .from("article_versions")
@@ -104,40 +140,82 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const nextVersionNumber = versions && versions.length > 0 ? versions[0].version_number + 1 : 1;
 
-  const filePath = `${user.id}/${paperId}/v${nextVersionNumber}/${file.name}`;
-  const { error: uploadError } = await supabase.storage.from("articles").upload(filePath, file);
-  if (uploadError) return { error: "Failed to upload file: " + uploadError.message };
+  const originalPath = buildOriginalArticlePath(
+    paperId,
+    nextVersionNumber,
+    originalFile!.name,
+  );
+  const blindPath = buildBlindArticlePath(paperId, nextVersionNumber, blindFile!.name);
+  const copyrightPath = copyrightFile
+    ? buildCopyrightArticlePath(paperId, copyrightFile.name)
+    : null;
+
+  try {
+    await uploadArticleFile(originalPath, originalFile!);
+    await uploadArticleFile(blindPath, blindFile!);
+    if (copyrightFile && copyrightPath) {
+      await uploadArticleFile(copyrightPath, copyrightFile);
+    }
+  } catch (error) {
+    try {
+      await removeArticleFiles([originalPath, blindPath, copyrightPath]);
+    } catch {
+      // Best-effort rollback.
+    }
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to upload article files",
+    };
+  }
 
   const { data: version, error: versionError } = await supabase
     .from("article_versions")
     .insert({
       article_id: paperId,
       version_number: nextVersionNumber,
-      storage_path: filePath,
-      file_name: file.name,
-      file_size: file.size,
+      storage_path: originalPath,
+      file_name: originalFile!.name,
+      file_size: originalFile!.size,
+      blind_storage_path: blindPath,
+      blind_file_name: blindFile!.name,
+      blind_file_size: blindFile!.size,
       notes: notes || null,
     })
     .select()
     .single();
 
-  if (versionError || !version) return { error: "Failed to create version record" };
+  if (versionError || !version) {
+    try {
+      await removeArticleFiles([originalPath, blindPath, copyrightPath]);
+    } catch {
+      // Best-effort rollback.
+    }
+    return { error: "Failed to create version record" };
+  }
+
+  const articleUpdate: Record<string, string | number | null> = {
+    current_version_id: version.id,
+    updated_at: new Date().toISOString(),
+  };
+  if (copyrightFile && copyrightPath) {
+    articleUpdate.copyright_storage_path = copyrightPath;
+    articleUpdate.copyright_file_name = copyrightFile.name;
+    articleUpdate.copyright_file_size = copyrightFile.size;
+    articleUpdate.copyright_uploaded_at = new Date().toISOString();
+  }
 
   const { error: updatePaperError } = await db
     .from("articles")
-    .update({
-      current_version_id: version.id,
-      updated_at: new Date().toISOString(),
-    })
+    .update(articleUpdate)
     .eq("id", paperId);
 
   if (updatePaperError) {
-    // Keep state consistent when metadata update fails after upload+version insert.
-    await supabase
-      .from("article_versions")
-      .delete()
-      .eq("id", version.id);
-    await supabase.storage.from("articles").remove([filePath]);
+    await supabase.from("article_versions").delete().eq("id", version.id);
+    try {
+      await removeArticleFiles([originalPath, blindPath, copyrightPath]);
+    } catch {
+      // Best-effort rollback.
+    }
 
     if (!adminClient && paper.author_id !== user.id) {
       return {
@@ -148,11 +226,30 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: "Failed to finalize the new version." };
   }
 
+  if (
+    copyrightFile &&
+    paper.copyright_storage_path &&
+    paper.copyright_storage_path !== copyrightPath
+  ) {
+    try {
+      await removeArticleFiles([paper.copyright_storage_path]);
+    } catch {
+      // Keep the article updated even if old storage cleanup fails.
+    }
+  }
+
   return redirect(`/papers/${paperId}`);
 }
 
 export default function NewVersion() {
-  const { paper, nextVersionNumber, user, profile } = useLoaderData<typeof loader>();
+  const {
+    paper,
+    nextVersionNumber,
+    user,
+    profile,
+    hasCopyrightConsent,
+    copyrightFileName,
+  } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
@@ -182,14 +279,40 @@ export default function NewVersion() {
 
           <Form method="post" encType="multipart/form-data" className="list">
             <div>
-              <label className="label">File</label>
+              <label className="label">Original File</label>
               <input
                 type="file"
-                name="file"
-                accept=".pdf,.doc,.docx"
+                name="originalFile"
+                accept={ARTICLE_FILE_ACCEPT}
                 required
                 className="input"
               />
+            </div>
+
+            <div>
+              <label className="label">Blinded Review File</label>
+              <input
+                type="file"
+                name="blindFile"
+                accept={ARTICLE_FILE_ACCEPT}
+                required
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="label">Copyright Consent (optional replacement)</label>
+              <input
+                type="file"
+                name="copyrightFile"
+                accept={ARTICLE_FILE_ACCEPT}
+                className="input"
+              />
+              <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+                {hasCopyrightConsent
+                  ? `Current file: ${copyrightFileName || "uploaded"}`
+                  : "No copyright consent uploaded yet. Add one now or before review/publish."}
+              </p>
             </div>
 
             <div>

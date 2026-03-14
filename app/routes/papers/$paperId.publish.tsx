@@ -16,6 +16,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         title,
         description,
         author_id,
+        copyright_file_name,
+        copyright_storage_path,
         status,
         authors:article_authors(profile_id)
       `
@@ -43,7 +45,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return redirect(`/papers/${paperId}`);
   }
 
-  return { paper, user, profile };
+  const hasCopyrightConsent = Boolean(paper.copyright_storage_path);
+
+  return { paper, user, profile, hasCopyrightConsent };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -59,7 +63,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("author_id, status, authors:article_authors(profile_id)")
+    .select(
+      "author_id, status, copyright_storage_path, authors:article_authors(profile_id)",
+    )
     .eq("id", paperId)
     .single();
 
@@ -76,6 +82,13 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw new Response("Unauthorized", { status: 403 });
   }
 
+  if (!paper.copyright_storage_path) {
+    return {
+      error:
+        "Copyright consent must be uploaded before this paper can be published.",
+    };
+  }
+
   const { error } = await supabase
     .from("articles")
     .update({ status: "published", title, description })
@@ -87,7 +100,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PublishPaper() {
-  const { paper, user, profile } = useLoaderData<typeof loader>();
+  const { paper, user, profile, hasCopyrightConsent } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
@@ -116,6 +130,14 @@ export default function PublishPaper() {
             </div>
           )}
 
+          {!hasCopyrightConsent && (
+            <div className="section-compact subtle" style={{ marginBottom: 10 }}>
+              <p className="text-sm" style={{ color: "#f6b8bd" }}>
+                Upload the article&apos;s copyright consent before publishing.
+              </p>
+            </div>
+          )}
+
           <Form method="post" className="list">
             <div>
               <label className="label">Publish Title</label>
@@ -139,7 +161,11 @@ export default function PublishPaper() {
             </div>
 
             <div className="row">
-              <button type="submit" className="btn btn-accent">
+              <button
+                type="submit"
+                className="btn btn-accent"
+                disabled={!hasCopyrightConsent}
+              >
                 Publish
               </button>
               <Link to={`/papers/${paper.id}`} className="btn btn-ghost">

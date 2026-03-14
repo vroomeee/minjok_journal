@@ -8,7 +8,18 @@ import {
 } from "react-router";
 import type { Route } from "./+types/new";
 import { requireUser, createSupabaseServerClient } from "~/lib/supabase.server";
-import { isEnglishFileName } from "~/lib/file-names";
+import {
+  ARTICLE_FILE_ACCEPT,
+  getOptionalFormFile,
+  validateArticleUpload,
+} from "~/lib/article-files";
+import {
+  buildBlindArticlePath,
+  buildCopyrightArticlePath,
+  buildOriginalArticlePath,
+  removeArticleFiles,
+  uploadArticleFile,
+} from "~/lib/article-files.server";
 import { Nav } from "~/components/nav";
 import { useEffect, useMemo, useState } from "react";
 
@@ -32,19 +43,35 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const title = formData.get("title") as string;
   const notes = formData.get("notes") as string;
-  const file = formData.get("file") as File;
+  const originalFile = getOptionalFormFile(formData, "originalFile");
+  const blindFile = getOptionalFormFile(formData, "blindFile");
+  const copyrightFile = getOptionalFormFile(formData, "copyrightFile");
   const coauthorIds = formData.getAll("coauthorIds").map(String);
 
-  if (!title || !file) return { error: "Title and file are required" };
-  if (!isEnglishFileName(file.name)) {
+  if (!title || !originalFile || !blindFile || !copyrightFile) {
     return {
       error:
-        "File name must only use English letters, numbers, dots, hyphens, or underscores (spaces are not allowed).",
+        "Title, original file, blinded file, and copyright consent are required.",
     };
   }
 
-  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
-  if (file.size > MAX_FILE_SIZE) return { error: "File too large. Maximum size is 100 MB." };
+  const originalValidation = validateArticleUpload(originalFile, "Original file");
+  if (originalValidation) {
+    return { error: originalValidation };
+  }
+
+  const blindValidation = validateArticleUpload(blindFile, "Blinded file");
+  if (blindValidation) {
+    return { error: blindValidation };
+  }
+
+  const copyrightValidation = validateArticleUpload(
+    copyrightFile,
+    "Copyright consent",
+  );
+  if (copyrightValidation) {
+    return { error: copyrightValidation };
+  }
 
   // Throttle duplicate submits: block if the user created an article in the last 5 seconds.
   const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
@@ -76,7 +103,15 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "Failed to create article" };
   }
 
-  // Insert author relationships (submitter + coauthors) before creating versions
+  const cleanupArticle = async () => {
+    try {
+      await supabase.from("articles").delete().eq("id", article.id);
+    } catch {
+      // Best-effort rollback.
+    }
+  };
+
+  // Insert author relationships (submitter + coauthors) before creating versions.
   const uniqueAuthorIds = Array.from(new Set([user.id, ...coauthorIds]));
   const authorRows = uniqueAuthorIds.map((profile_id, idx) => ({
     article_id: article.id,
@@ -89,42 +124,83 @@ export async function action({ request }: Route.ActionArgs) {
       .from("article_authors")
       .insert(authorRows);
     if (authorsError) {
+      await cleanupArticle();
       return { error: "Failed to add authors: " + authorsError.message };
     }
   }
 
-  const filePath = `${user.id}/${article.id}/v1/${file.name}`;
-  const { error: uploadError } = await supabase.storage
-    .from("articles")
-    .upload(filePath, file);
-  if (uploadError)
-    return { error: "Failed to upload file: " + uploadError.message };
+  const originalPath = buildOriginalArticlePath(article.id, 1, originalFile.name);
+  const blindPath = buildBlindArticlePath(article.id, 1, blindFile.name);
+  const copyrightPath = buildCopyrightArticlePath(article.id, copyrightFile.name);
+
+  try {
+    await uploadArticleFile(originalPath, originalFile);
+    await uploadArticleFile(blindPath, blindFile);
+    await uploadArticleFile(copyrightPath, copyrightFile);
+  } catch (error) {
+    try {
+      await removeArticleFiles([originalPath, blindPath, copyrightPath]);
+    } catch {
+      // Best-effort rollback.
+    }
+    await cleanupArticle();
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to upload article files",
+    };
+  }
 
   const { data: version, error: versionError } = await supabase
     .from("article_versions")
     .insert({
       article_id: article.id,
       version_number: 1,
-      storage_path: filePath,
-      file_name: file.name,
-      file_size: file.size,
+      storage_path: originalPath,
+      file_name: originalFile.name,
+      file_size: originalFile.size,
+      blind_storage_path: blindPath,
+      blind_file_name: blindFile.name,
+      blind_file_size: blindFile.size,
       notes: notes || null,
     })
     .select()
     .single();
 
-  if (versionError || !version)
+  if (versionError || !version) {
+    try {
+      await removeArticleFiles([originalPath, blindPath, copyrightPath]);
+    } catch {
+      // Best-effort rollback.
+    }
+    await cleanupArticle();
     return {
       error: `Failed to create version record: ${versionError?.message || "unknown error"}`,
     };
+  }
 
-  await supabase
+  const { error: updateArticleError } = await supabase
     .from("articles")
     .update({
       current_version_id: version.id,
       updated_at: new Date().toISOString(),
+      copyright_storage_path: copyrightPath,
+      copyright_file_name: copyrightFile.name,
+      copyright_file_size: copyrightFile.size,
+      copyright_uploaded_at: new Date().toISOString(),
     })
     .eq("id", article.id);
+
+  if (updateArticleError) {
+    try {
+      await removeArticleFiles([originalPath, blindPath, copyrightPath]);
+    } catch {
+      // Best-effort rollback.
+    }
+    await cleanupArticle();
+    return {
+      error: `Failed to finalize article metadata: ${updateArticleError.message}`,
+    };
+  }
 
   return redirect(`/papers/${article.id}`);
 }
@@ -163,7 +239,7 @@ export default function NewPaper() {
       searchFetcher.load(`/api/search-profiles?${params.toString()}`);
     }, 500);
     return () => clearTimeout(timeout);
-  }, [query, searchFetcher]);
+  }, [query, searchFetcher, user?.id]);
 
   const results = searchFetcher.data?.results || [];
   const selectedList = useMemo(() => Object.values(selected), [selected]);
@@ -179,7 +255,7 @@ export default function NewPaper() {
       } else {
         next[profileId] = entry;
       }
-      // Always keep submitter checked
+      // Always keep submitter checked.
       if (user && !next[user.id]) {
         next[user.id] = {
           id: user.id,
@@ -203,7 +279,8 @@ export default function NewPaper() {
             <div>
               <h1 style={{ fontSize: 22, margin: 0 }}>Submit New Paper</h1>
               <p className="muted" style={{ margin: 0 }}>
-                Start a draft and upload your first version.
+                Start a draft with the original file, blinded review file, and
+                copyright consent.
               </p>
             </div>
             <Link to="/papers" className="btn btn-ghost">
@@ -234,11 +311,31 @@ export default function NewPaper() {
               />
             </div>
             <div>
-              <label className="label">Initial Version (PDF/DOC)</label>
+              <label className="label">Original File</label>
               <input
                 type="file"
-                name="file"
-                accept=".pdf,.doc,.docx"
+                name="originalFile"
+                accept={ARTICLE_FILE_ACCEPT}
+                required
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Blinded Review File</label>
+              <input
+                type="file"
+                name="blindFile"
+                accept={ARTICLE_FILE_ACCEPT}
+                required
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Copyright Consent</label>
+              <input
+                type="file"
+                name="copyrightFile"
+                accept={ARTICLE_FILE_ACCEPT}
                 required
                 className="input"
               />

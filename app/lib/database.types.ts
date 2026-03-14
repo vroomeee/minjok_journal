@@ -84,6 +84,9 @@ export type Database = {
       article_versions: {
         Row: {
           article_id: string;
+          blind_file_name: string | null;
+          blind_file_size: number | null;
+          blind_storage_path: string | null;
           created_at: string | null;
           file_name: string;
           file_size: number | null;
@@ -94,6 +97,9 @@ export type Database = {
         };
         Insert: {
           article_id: string;
+          blind_file_name?: string | null;
+          blind_file_size?: number | null;
+          blind_storage_path?: string | null;
           created_at?: string | null;
           file_name: string;
           file_size?: number | null;
@@ -104,6 +110,9 @@ export type Database = {
         };
         Update: {
           article_id?: string;
+          blind_file_name?: string | null;
+          blind_file_size?: number | null;
+          blind_storage_path?: string | null;
           created_at?: string | null;
           file_name?: string;
           file_size?: number | null;
@@ -126,6 +135,10 @@ export type Database = {
         Row: {
           author_id: string;
           created_at: string | null;
+          copyright_file_name: string | null;
+          copyright_file_size: number | null;
+          copyright_storage_path: string | null;
+          copyright_uploaded_at: string | null;
           current_version_id: string | null;
           description: string | null;
           id: string;
@@ -136,6 +149,10 @@ export type Database = {
         Insert: {
           author_id: string;
           created_at?: string | null;
+          copyright_file_name?: string | null;
+          copyright_file_size?: number | null;
+          copyright_storage_path?: string | null;
+          copyright_uploaded_at?: string | null;
           current_version_id?: string | null;
           description?: string | null;
           id?: string;
@@ -146,6 +163,10 @@ export type Database = {
         Update: {
           author_id?: string;
           created_at?: string | null;
+          copyright_file_name?: string | null;
+          copyright_file_size?: number | null;
+          copyright_storage_path?: string | null;
+          copyright_uploaded_at?: string | null;
           current_version_id?: string | null;
           description?: string | null;
           id?: string;

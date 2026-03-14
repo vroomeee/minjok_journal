@@ -12,8 +12,15 @@ import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/$paperId";
 import {
   createSupabaseServerClient,
+  getUserAndProfile,
   getUserProfile,
 } from "~/lib/supabase.server";
+import {
+  createSignedArticleUrls,
+  removeArticleFiles,
+} from "~/lib/article-files.server";
+import { canAccessArticle, isArticleAuthor } from "~/lib/article-access";
+import { isReviewRole } from "~/lib/roles";
 import { cleanupIssuesAndVolumes } from "~/lib/issues";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
@@ -45,9 +52,18 @@ type PaperComment = {
   } | null;
 };
 
+type ReviewRequirementState = {
+  hasCurrentOriginal: boolean;
+  hasCurrentBlind: boolean;
+  hasCopyrightConsent: boolean;
+  canSubmitForReview: boolean;
+  canPublish: boolean;
+};
+
 // Server-side loader to fetch paper details
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
+  const { user, profile } = await getUserAndProfile(request);
   const { paperId } = params;
 
   // Fetch paper with author and versions
@@ -76,7 +92,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         version_number,
         created_at,
         file_name,
+        file_size,
         storage_path,
+        blind_file_name,
+        blind_file_size,
+        blind_storage_path,
         notes
       )
     `,
@@ -88,6 +108,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     console.error("Error fetching paper:", error);
     console.error("Paper ID:", paperId);
     throw new Response("Paper not found", { status: 404 });
+  }
+
+  if (!canAccessArticle(paper, user?.id, profile?.role_type)) {
+    throw new Response("Unauthorized", { status: 403 });
   }
 
   // Sort versions by version number descending
@@ -120,25 +144,34 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     comments = commentsData || [];
   }
 
-  const publishedVersion =
+  const currentVersion =
     paper.versions?.find((v) => v.id === paper.current_version_id) ||
     paper.versions?.[0] ||
     null;
+  const publishedVersion = currentVersion;
 
   let publishedFileViewUrl: string | null = null;
   let publishedFileDownloadUrl: string | null = null;
-  if (publishedVersion?.storage_path) {
-    const { data: viewUrlData } = supabase.storage
-      .from("articles")
-      .getPublicUrl(publishedVersion.storage_path);
-    const { data: downloadUrlData } = supabase.storage
-      .from("articles")
-      .getPublicUrl(publishedVersion.storage_path, {
-        download: publishedVersion.file_name,
-      });
-    publishedFileViewUrl = viewUrlData.publicUrl;
-    publishedFileDownloadUrl = downloadUrlData.publicUrl;
+  if (paper.status === "published" && publishedVersion?.storage_path) {
+    const urls = await createSignedArticleUrls(
+      publishedVersion.storage_path,
+      publishedVersion.file_name,
+    );
+    publishedFileViewUrl = urls.viewUrl;
+    publishedFileDownloadUrl = urls.downloadUrl;
   }
+
+  const reviewRequirements: ReviewRequirementState = {
+    hasCurrentOriginal: Boolean(currentVersion?.storage_path),
+    hasCurrentBlind: Boolean(currentVersion?.blind_storage_path),
+    hasCopyrightConsent: Boolean(paper.copyright_storage_path),
+    canSubmitForReview: Boolean(
+      currentVersion?.storage_path &&
+        currentVersion?.blind_storage_path &&
+        paper.copyright_storage_path,
+    ),
+    canPublish: Boolean(paper.copyright_storage_path),
+  };
 
   const formattedPaper = {
     ...paper,
@@ -160,6 +193,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     publishedVersion,
     publishedFileViewUrl,
     publishedFileDownloadUrl,
+    reviewRequirements,
   };
 }
 
@@ -175,14 +209,23 @@ export async function action({ request, params }: Route.ActionArgs) {
     const { user, profile } = await getUserProfile(request);
     const { data: paper } = await supabase
       .from("articles")
-      .select("author_id, status, authors:article_authors(profile_id)")
+      .select(
+        `
+        author_id,
+        status,
+        current_version_id,
+        copyright_storage_path,
+        authors:article_authors(profile_id),
+        current_version:article_versions!current_version_id(
+          id,
+          storage_path,
+          blind_storage_path
+        )
+      `,
+      )
       .eq("id", paperId)
       .single();
-    const isAuthor =
-      paper?.author_id === user.id ||
-      paper?.authors?.some(
-        (a: { profile_id: string }) => a.profile_id === user.id,
-      );
+    const isAuthor = isArticleAuthor(paper, user.id);
     const isPrimaryAuthor = paper?.author_id === user.id;
     const isAdmin = profile.role_type === "admin";
     return { user, profile, paper, isAuthor, isPrimaryAuthor, isAdmin };
@@ -215,14 +258,26 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Remove storage objects for all versions of this paper
     const { data: versionPaths } = await supabase
       .from("article_versions")
-      .select("storage_path")
+      .select("storage_path, blind_storage_path")
       .eq("article_id", paperId);
-    const pathsToRemove =
-      versionPaths
-        ?.map((v: { storage_path: string | null }) => v.storage_path)
-        .filter(Boolean) || [];
-    if (pathsToRemove.length > 0) {
-      await supabase.storage.from("articles").remove(pathsToRemove as string[]);
+    const pathsToRemove = [
+      ...(versionPaths || []).flatMap(
+        (v: {
+          storage_path: string | null;
+          blind_storage_path?: string | null;
+        }) => [v.storage_path, v.blind_storage_path],
+      ),
+      paper?.copyright_storage_path || null,
+    ];
+    try {
+      await removeArticleFiles(pathsToRemove);
+    } catch (storageError) {
+      return {
+        error:
+          storageError instanceof Error
+            ? storageError.message
+            : "Failed to delete paper files",
+      };
     }
 
     const { error } = await supabase
@@ -248,11 +303,37 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     // Validate allowed status transitions
     const allowed =
-      (paper.status === "draft" && newStatus === "in_review" && isPrimaryAuthor) ||
-      (paper.status === "in_review" && newStatus === "published" && isAdmin);
+      (paper.status === "draft" &&
+        newStatus === "in_review" &&
+        isPrimaryAuthor) ||
+      (paper.status === "in_review" &&
+        newStatus === "published" &&
+        isAdmin);
 
     if (!allowed) {
       return { error: "Invalid status transition" };
+    }
+
+    if (newStatus === "in_review") {
+      if (!paper.current_version?.storage_path) {
+        return { error: "The current version is missing the original file." };
+      }
+      if (!paper.current_version?.blind_storage_path) {
+        return { error: "Upload a blinded review file before submitting for review." };
+      }
+      if (!paper.copyright_storage_path) {
+        return {
+          error:
+            "Upload the article's copyright consent before submitting for review.",
+        };
+      }
+    }
+
+    if (newStatus === "published" && !paper.copyright_storage_path) {
+      return {
+        error:
+          "Copyright consent must be uploaded before this paper can be published.",
+      };
     }
 
     const { error } = await supabase
@@ -422,6 +503,7 @@ export default function PaperDetail() {
     publishedVersion,
     publishedFileViewUrl,
     publishedFileDownloadUrl,
+    reviewRequirements,
   } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as {
     user?: { id: string };
@@ -455,22 +537,37 @@ export default function PaperDetail() {
     paper.status !== "published",
   );
 
-  const isAuthor =
-    paper.author_id === user?.id ||
-    paper.authors?.some((a: { profile_id: string }) => a.profile_id === user?.id);
+  const isAuthor = isArticleAuthor(paper, user?.id);
   const isPrimaryAuthor = paper.author_id === user?.id;
   const isAdmin = profile?.role_type === "admin";
+  const isReviewer = isReviewRole(profile?.role_type);
   const canManagePaper = isPrimaryAuthor || isAdmin;
   const canUnpublish = isAdmin;
   const canDelete = isAdmin || (isPrimaryAuthor && paper.status !== "published");
   const canPublish = isAdmin;
   const canUploadNewVersion = isAuthor && paper.status !== "published";
   const canSubmitForReview = isPrimaryAuthor && paper.status === "draft";
+  const showReadinessChecklist =
+    paper.status !== "published" && (isAuthor || isAdmin || isReviewer);
   const showComments = paper.status === "published" && !!activeVersionId;
   const truncateNotes = (notes?: string | null) =>
     notes && notes.length > 200 ? `${notes.slice(0, 200)}...` : notes;
   const rowsForBody = (body: string) =>
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
+  const readinessItems = [
+    {
+      label: "Current version original file",
+      ready: reviewRequirements.hasCurrentOriginal,
+    },
+    {
+      label: "Current version blinded file",
+      ready: reviewRequirements.hasCurrentBlind,
+    },
+    {
+      label: "Article copyright consent",
+      ready: reviewRequirements.hasCopyrightConsent,
+    },
+  ];
 
   return (
     <div className="page">
@@ -523,13 +620,19 @@ export default function PaperDetail() {
           {(isAuthor || isAdmin) && (
             <div className="row-wrap" style={{ marginTop: 4 }}>
               {canSubmitForReview && (
-                <Form method="post">
-                  <input type="hidden" name="intent" value="updateStatus" />
-                  <input type="hidden" name="status" value="in_review" />
-                  <button type="submit" className="btn btn-warn">
+                reviewRequirements.canSubmitForReview ? (
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="updateStatus" />
+                    <input type="hidden" name="status" value="in_review" />
+                    <button type="submit" className="btn btn-warn">
+                      Submit for Review
+                    </button>
+                  </Form>
+                ) : (
+                  <button type="button" className="btn btn-warn" disabled>
                     Submit for Review
                   </button>
-                </Form>
+                )
               )}
               {isAuthor && canUploadNewVersion && (
                 <Link
@@ -539,14 +642,20 @@ export default function PaperDetail() {
                   Upload New Version
                 </Link>
               )}
-              {canPublish && paper.status === "in_review" && (
-                <Link
-                  to={`/papers/${paper.id}/publish`}
-                  className="btn btn-accent"
-                >
-                  Publish
-                </Link>
-              )}
+              {canPublish &&
+                paper.status === "in_review" &&
+                (reviewRequirements.canPublish ? (
+                  <Link
+                    to={`/papers/${paper.id}/publish`}
+                    className="btn btn-accent"
+                  >
+                    Publish
+                  </Link>
+                ) : (
+                  <button type="button" className="btn btn-accent" disabled>
+                    Publish
+                  </button>
+                ))}
               {canUnpublish && paper.status === "published" && (
                 <Form method="post">
                   <input type="hidden" name="intent" value="unpublish" />
@@ -573,6 +682,36 @@ export default function PaperDetail() {
             </div>
           )}
         </div>
+
+        {showReadinessChecklist && (
+          <div className="section">
+            <h2 style={{ fontSize: 18, marginBottom: 10 }}>
+              Review / Publish Requirements
+            </h2>
+            <div className="card-grid">
+              {readinessItems.map((item) => (
+                <div key={item.label} className="section-compact">
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <span>{item.label}</span>
+                    <span className="muted" style={{ fontSize: 13 }}>
+                      {item.ready ? "Ready" : "Missing"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {!reviewRequirements.canSubmitForReview && paper.status === "draft" && (
+              <p className="muted" style={{ marginTop: 10 }}>
+                Upload the missing files before submitting this paper for review.
+              </p>
+            )}
+            {!reviewRequirements.canPublish && paper.status === "in_review" && (
+              <p className="muted" style={{ marginTop: 10 }}>
+                Publish is blocked until the article&apos;s copyright consent is uploaded.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="section">
           <div

@@ -10,11 +10,28 @@ import {
 import type { Route } from "./+types/$paperId.versions.$versionId";
 import {
   createSupabaseServerClient,
-  createSupabaseAdminClient,
   requireUser,
   getUserProfile,
+  getUserAndProfile,
 } from "~/lib/supabase.server";
-import { isEnglishFileName } from "~/lib/file-names";
+import {
+  ARTICLE_FILE_ACCEPT,
+  getOptionalFormFile,
+  validateArticleUpload,
+} from "~/lib/article-files";
+import {
+  buildBlindArticlePath,
+  buildOriginalArticlePath,
+  createSignedArticleUrl,
+  createSignedArticleUrls,
+  removeArticleFiles,
+  uploadArticleFile,
+} from "~/lib/article-files.server";
+import {
+  canAccessArticle,
+  isArticleAuthor,
+  shouldUseBlindReviewFile,
+} from "~/lib/article-access";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef } from "react";
@@ -27,7 +44,7 @@ const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
 });
 
-function formatDate(dateStr: string | null): string {
+function formatDate(dateStr: string | null) {
   if (!dateStr) return "n/a";
   return dateFmt.format(new Date(dateStr));
 }
@@ -48,13 +65,19 @@ type VersionComment = {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
+  const { user, profile } = await getUserAndProfile(request);
   const { paperId, versionId } = params;
 
   const { data: paper } = await supabase
     .from("articles")
     .select(
       `
-        *,
+        id,
+        title,
+        author_id,
+        status,
+        copyright_file_name,
+        copyright_storage_path,
         authors:article_authors(
           profile_id,
           profile:profiles!article_authors_profile_id_fkey(
@@ -64,29 +87,59 @@ export async function loader({ request, params }: Route.LoaderArgs) {
             role_type
           )
         )
-      `
+      `,
     )
     .eq("id", paperId)
     .single();
+
+  if (!paper) {
+    throw new Response("Paper not found", { status: 404 });
+  }
+
+  if (!canAccessArticle(paper, user?.id, profile?.role_type)) {
+    throw new Response("Unauthorized", { status: 403 });
+  }
 
   const { data: version, error: versionError } = await supabase
     .from("article_versions")
     .select("*")
     .eq("id", versionId)
+    .eq("article_id", paperId)
     .single();
 
   if (versionError || !version) {
     throw new Response("Version not found", { status: 404 });
   }
 
-  const { data: viewUrlData } = supabase.storage
-    .from("articles")
-    .getPublicUrl(version.storage_path);
-  const { data: downloadUrlData } = supabase.storage
-    .from("articles")
-    .getPublicUrl(version.storage_path, { download: version.file_name });
-  const fileViewUrl = viewUrlData.publicUrl;
-  const fileDownloadUrl = downloadUrlData.publicUrl;
+  const prefersBlindFile =
+    shouldUseBlindReviewFile(profile?.role_type) &&
+    Boolean(version.blind_storage_path);
+  const selectedPath = prefersBlindFile
+    ? version.blind_storage_path
+    : version.storage_path;
+  const selectedFileName = prefersBlindFile
+    ? version.blind_file_name || version.file_name
+    : version.file_name;
+  const activeFileLabel = prefersBlindFile
+    ? "Blinded Review File"
+    : "Original File";
+  const isBlindFallback =
+    shouldUseBlindReviewFile(profile?.role_type) && !version.blind_storage_path;
+
+  let fileViewUrl: string | null = null;
+  let fileDownloadUrl: string | null = null;
+  if (selectedPath && selectedFileName) {
+    const urls = await createSignedArticleUrls(selectedPath, selectedFileName);
+    fileViewUrl = urls.viewUrl;
+    fileDownloadUrl = urls.downloadUrl;
+  }
+
+  const copyrightDownloadUrl =
+    paper.copyright_storage_path && paper.copyright_file_name
+      ? await createSignedArticleUrl(paper.copyright_storage_path, {
+          download: paper.copyright_file_name,
+        })
+      : null;
 
   const { data: comments } = await supabase
     .from("comments")
@@ -99,7 +152,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         full_name,
         role_type
       )
-    `
+    `,
     )
     .eq("version_id", versionId)
     .is("parent_id", null)
@@ -119,7 +172,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
           full_name,
           role_type
         )
-      `
+      `,
       )
       .in("parent_id", commentIds)
       .order("created_at", { ascending: true });
@@ -147,18 +200,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     version: formattedVersion,
     fileViewUrl,
     fileDownloadUrl,
+    activeFileLabel,
+    activeFileName: selectedFileName,
+    isBlindFallback,
     comments: formattedComments,
     replies: formattedReplies,
     totalVersions: versionList?.length || 0,
+    copyrightDownloadUrl,
+    copyrightFileName: paper.copyright_file_name,
   };
 }
 
-// Server-side action to add comments or manage version notes
 export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireUser(request);
   const { supabase } = createSupabaseServerClient(request);
-  const adminClient = createSupabaseAdminClient();
-  const db = adminClient?.supabase || supabase;
   const { paperId, versionId } = params;
 
   const formData = await request.formData();
@@ -173,30 +228,34 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: paper } = await supabase
     .from("articles")
-    .select("author_id, status, authors:article_authors(profile_id)")
+    .select(
+      "author_id, status, current_version_id, copyright_storage_path, authors:article_authors(profile_id)",
+    )
     .eq("id", paperId)
     .single();
-  const isAuthor =
-    paper?.author_id === user.id ||
-    paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user.id);
+  const isAuthor = isArticleAuthor(paper, user.id);
   const isPrimaryAuthor = paper?.author_id === user.id;
 
-  if ((intent === "updateNotes" || intent === "deleteNotes") && !paper) {
-    return { error: "Paper not found" };
+  if (!paper || !canAccessArticle(paper, user.id, profile?.role_type)) {
+    return { error: "Unauthorized" };
   }
 
   if (intent === "deleteVersion") {
-    if (!paper || (!isPrimaryAuthor && !isAdmin))
+    if (!paper || (!isPrimaryAuthor && !isAdmin)) {
       return { error: "Unauthorized to delete this version" };
+    }
 
     const { data: versions } = await supabase
       .from("article_versions")
-      .select("id, version_number, created_at, storage_path")
+      .select(
+        "id, version_number, created_at, storage_path, blind_storage_path",
+      )
       .eq("article_id", paperId)
       .order("version_number", { ascending: false });
 
-    if (!versions || versions.length === 0)
+    if (!versions || versions.length === 0) {
       return { error: "No versions found for this paper" };
+    }
     const targetVersion = versions.find((v) => v.id === versionId);
     if (!targetVersion) return { error: "Version not found" };
 
@@ -209,52 +268,65 @@ export async function action({ request, params }: Route.ActionArgs) {
       };
     }
 
-    // Remove storage objects for this version (and all if deleting last)
-    const targetPath = targetVersion.storage_path
-      ? [targetVersion.storage_path]
-      : [];
-    const allPaths = versions
-      .map((v) => v.storage_path)
-      .filter((p): p is string => Boolean(p));
+    const targetPaths = [
+      targetVersion.storage_path,
+      targetVersion.blind_storage_path,
+    ];
+    const allPaths = versions.flatMap((v) => [
+      v.storage_path,
+      v.blind_storage_path,
+    ]);
 
     if (versions.length === 1) {
-      // Deleting the only version — delete entire paper
-      if (allPaths.length > 0) {
-        await supabase.storage.from("articles").remove(allPaths);
+      try {
+        await removeArticleFiles([...allPaths, paper.copyright_storage_path]);
+      } catch (error) {
+        return {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to remove article files",
+        };
       }
-      const { error: deleteArticleError } = await db
+
+      const { error: deleteArticleError } = await supabase
         .from("articles")
         .delete()
         .eq("id", paperId);
-      if (deleteArticleError)
+      if (deleteArticleError) {
         return { error: "Failed to delete paper" };
-
-      const { error: deleteVersionError } = await db
-        .from("article_versions")
-        .delete()
-        .eq("id", versionId);
-      if (deleteVersionError) return { error: "Failed to delete version" };
+      }
 
       return redirect("/papers");
     }
 
-    // Multiple versions — check fallback BEFORE deleting anything
     const fallbackVersion = versions.find((v) => v.id !== versionId);
-    if (!fallbackVersion)
+    if (!fallbackVersion) {
       return { error: "Could not determine fallback version" };
-
-    if (targetPath.length > 0) {
-      await supabase.storage.from("articles").remove(targetPath);
     }
 
-    const { error: updateArticleError } = await db
-      .from("articles")
-      .update({ current_version_id: fallbackVersion.id })
-      .eq("id", paperId);
-    if (updateArticleError)
-      return { error: "Failed to update paper to fallback version" };
+    try {
+      await removeArticleFiles(targetPaths);
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to remove version files",
+      };
+    }
 
-    const { error: deleteVersionError } = await db
+    if (paper.current_version_id === versionId) {
+      const { error: updateArticleError } = await supabase
+        .from("articles")
+        .update({ current_version_id: fallbackVersion.id })
+        .eq("id", paperId);
+      if (updateArticleError) {
+        return { error: "Failed to update paper to fallback version" };
+      }
+    }
+
+    const { error: deleteVersionError } = await supabase
       .from("article_versions")
       .delete()
       .eq("id", versionId);
@@ -263,30 +335,30 @@ export async function action({ request, params }: Route.ActionArgs) {
     return redirect(`/papers/${paperId}`);
   }
 
-  if (intent === "replaceFile") {
+  if (intent === "replaceOriginalFile" || intent === "replaceBlindFile") {
     if (!isAdmin) {
       return { error: "Only admins can replace files for an existing version" };
     }
 
-    const replacementFile = formData.get("replacementFile");
-    if (!(replacementFile instanceof File) || replacementFile.size === 0) {
-      return { error: "Replacement file is required" };
-    }
-    if (!isEnglishFileName(replacementFile.name)) {
-      return {
-        error:
-          "File name must only use English letters, numbers, dots, hyphens, or underscores (spaces are not allowed).",
-      };
-    }
-
-    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
-    if (replacementFile.size > MAX_FILE_SIZE) {
-      return { error: "File too large. Maximum size is 100 MB." };
+    const fieldName =
+      intent === "replaceBlindFile"
+        ? "replacementBlindFile"
+        : "replacementOriginalFile";
+    const replacementFile = getOptionalFormFile(formData, fieldName);
+    const label =
+      intent === "replaceBlindFile"
+        ? "Replacement blinded file"
+        : "Replacement original file";
+    const validationError = validateArticleUpload(replacementFile, label);
+    if (validationError) {
+      return { error: validationError };
     }
 
     const { data: targetVersion, error: targetVersionError } = await supabase
       .from("article_versions")
-      .select("id, article_id, storage_path")
+      .select(
+        "id, article_id, version_number, storage_path, blind_storage_path",
+      )
       .eq("id", versionId)
       .eq("article_id", paperId)
       .single();
@@ -295,82 +367,86 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Version not found" };
     }
 
-    const originalPath = targetVersion.storage_path;
-    const lastSlashIndex = originalPath.lastIndexOf("/");
-    const parentPath =
-      lastSlashIndex >= 0 ? originalPath.slice(0, lastSlashIndex) : "";
-    // Use a new object path on each replacement so the stored filename updates and caches are busted.
-    const replacementPath = parentPath
-      ? `${parentPath}/${Date.now()}-${replacementFile.name}`
-      : `${Date.now()}-${replacementFile.name}`;
+    const replacementPath =
+      intent === "replaceBlindFile"
+        ? buildBlindArticlePath(
+            targetVersion.article_id,
+            targetVersion.version_number,
+            replacementFile!.name,
+          )
+        : buildOriginalArticlePath(
+            targetVersion.article_id,
+            targetVersion.version_number,
+            replacementFile!.name,
+          );
 
-    const storageClient = adminClient?.supabase || supabase;
-    const { error: uploadError } = await storageClient.storage
-      .from("articles")
-      .upload(replacementPath, replacementFile, {
-        upsert: true,
-        contentType: replacementFile.type || undefined,
-      });
-
-    if (uploadError) {
-      if (!adminClient) {
-        return {
-          error:
-            "Failed to replace version file in storage: " +
-            uploadError.message +
-            ". This server may be missing SUPABASE_SERVICE_ROLE_KEY, which is often required for admin overwrite operations when storage RLS is strict.",
-        };
-      }
+    try {
+      await uploadArticleFile(replacementPath, replacementFile!);
+    } catch (error) {
       return {
         error:
-          "Failed to replace version file in storage: " + uploadError.message,
+          error instanceof Error
+            ? error.message
+            : "Failed to replace version file",
       };
     }
 
-    const { error: updateVersionError } = await db
+    const updatePayload =
+      intent === "replaceBlindFile"
+        ? {
+            blind_storage_path: replacementPath,
+            blind_file_name: replacementFile!.name,
+            blind_file_size: replacementFile!.size,
+          }
+        : {
+            storage_path: replacementPath,
+            file_name: replacementFile!.name,
+            file_size: replacementFile!.size,
+          };
+
+    const { error: updateVersionError } = await supabase
       .from("article_versions")
-      .update({
-        storage_path: replacementPath,
-        file_name: replacementFile.name,
-        file_size: replacementFile.size,
-      })
+      .update(updatePayload)
       .eq("id", versionId)
       .eq("article_id", paperId);
 
     if (updateVersionError) {
-      await storageClient.storage.from("articles").remove([replacementPath]);
-      if (!adminClient) {
-        return {
-          error:
-            "File was replaced in storage, but updating version metadata failed: " +
-            updateVersionError.message +
-            ". This server may be missing SUPABASE_SERVICE_ROLE_KEY, which can be required for admin metadata updates under strict RLS.",
-        };
+      try {
+        await removeArticleFiles([replacementPath]);
+      } catch {
+        // Best-effort cleanup.
       }
       return {
-        error:
-          "File was replaced in storage, but updating version metadata failed: " +
-          updateVersionError.message,
+        error: `Failed to update version metadata: ${updateVersionError.message}`,
       };
     }
 
-    if (replacementPath !== originalPath) {
-      await storageClient.storage.from("articles").remove([originalPath]);
+    const originalPath =
+      intent === "replaceBlindFile"
+        ? targetVersion.blind_storage_path
+        : targetVersion.storage_path;
+    if (originalPath && originalPath !== replacementPath) {
+      try {
+        await removeArticleFiles([originalPath]);
+      } catch {
+        // Keep new metadata even if old storage cleanup fails.
+      }
     }
 
     return redirect(`/papers/${paperId}/versions/${versionId}`);
   }
 
   if (intent === "updateNotes" || intent === "deleteNotes") {
-    if (!paper || (!isAuthor && !isAdmin))
+    if (!paper || (!isAuthor && !isAdmin)) {
       return { error: "Unauthorized to edit notes" };
+    }
 
     const notesValue =
       intent === "deleteNotes"
         ? null
         : (formData.get("notes") as string | null) || null;
 
-    const { error: updateError } = await db
+    const { error: updateError } = await supabase
       .from("article_versions")
       .update({ notes: notesValue })
       .eq("id", versionId)
@@ -395,9 +471,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       .single();
     if (!comment) return { error: "Comment not found" };
 
-    const { user, profile } = await getUserProfile(request);
-    const isAdmin = profile.role_type === "admin";
-    if (comment.author_id !== user.id && !isAdmin) {
+    const { user: actingUser, profile: actingProfile } =
+      await getUserProfile(request);
+    const actingIsAdmin = actingProfile.role_type === "admin";
+    if (comment.author_id !== actingUser.id && !actingIsAdmin) {
       return { error: "Unauthorized" };
     }
 
@@ -444,9 +521,14 @@ export default function VersionReview() {
     version,
     fileViewUrl,
     fileDownloadUrl,
+    activeFileLabel,
+    activeFileName,
+    isBlindFallback,
     comments,
     replies,
     totalVersions,
+    copyrightDownloadUrl,
+    copyrightFileName,
   } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as
     | { user?: { id: string }; profile?: { role_type?: string | null } }
@@ -461,6 +543,7 @@ export default function VersionReview() {
   const handledCommentSuccess = useRef(false);
   const rowsForBody = (body: string) =>
     Math.min(14, Math.max(3, Math.ceil((body?.length || 0) / 60)));
+
   useEffect(() => {
     if (commentFetcher.state === "submitting") {
       handledCommentSuccess.current = false;
@@ -476,10 +559,9 @@ export default function VersionReview() {
       handledCommentSuccess.current = true;
     }
   }, [commentFetcher.state, commentFetcher.data, revalidator]);
+
   const isAdmin = profile?.role_type === "admin";
-  const isAuthor =
-    paper?.author_id === user?.id ||
-    paper?.authors?.some((a: { profile_id: string }) => a.profile_id === user?.id);
+  const isAuthor = isArticleAuthor(paper, user?.id);
   const isPrimaryAuthor = paper?.author_id === user?.id;
   const canEditNotes = isAdmin || isAuthor;
   const canDeleteVersion =
@@ -488,7 +570,7 @@ export default function VersionReview() {
       (totalVersions > 1 || paper?.status !== "published"));
   const deleteWarning =
     totalVersions === 1
-      ? "WARNING: this is the only version of the paper. If you delete this, the paper will be deleted as well."
+      ? "WARNING: this is the only version of the paper. If you delete this, the paper and copyright consent will be deleted as well."
       : "Delete this version?";
   const truncatedNotes =
     version.notes && version.notes.length > 200
@@ -538,13 +620,21 @@ export default function VersionReview() {
             className="row"
             style={{ gap: 12, flexWrap: "wrap", marginTop: 6 }}
           >
-            <span className="meta">File: {version.file_name}</span>
+            <span className="meta">
+              {activeFileLabel}: {activeFileName}
+            </span>
             {version.notes && (
               <span className="muted" style={{ fontStyle: "italic" }}>
                 Notes: {truncatedNotes}
               </span>
             )}
           </div>
+          {isBlindFallback && (
+            <p className="muted" style={{ marginTop: 8 }}>
+              Blinded file is missing for this version, so the original file is
+              being shown.
+            </p>
+          )}
 
           {canEditNotes && (
             <div className="section-compact" style={{ marginTop: 10 }}>
@@ -586,62 +676,107 @@ export default function VersionReview() {
                 Admin File Replacement
               </h4>
               <p className="muted text-sm" style={{ margin: "0 0 8px" }}>
-                Replace the file for this version without creating a new version.
+                Replace the original file, or add/replace the blinded review
+                file, without creating a new version.
               </p>
-              <Form
-                method="post"
-                encType="multipart/form-data"
-                className="list"
-                onSubmit={(e) => {
-                  if (
-                    !confirm(
-                      "Replace this version file in storage? This keeps the same version record."
-                    )
-                  ) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                <input type="hidden" name="intent" value="replaceFile" />
-                <input
-                  type="file"
-                  name="replacementFile"
-                  accept=".pdf,.doc,.docx"
-                  required
-                  className="input"
-                />
-                <button type="submit" className="btn btn-warn">
-                  Replace File (Admin)
-                </button>
-              </Form>
+              <div className="card-grid">
+                <Form
+                  method="post"
+                  encType="multipart/form-data"
+                  className="list"
+                  onSubmit={(e) => {
+                    if (
+                      !confirm(
+                        "Replace the original file for this version in storage?"
+                      )
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <input type="hidden" name="intent" value="replaceOriginalFile" />
+                  <input
+                    type="file"
+                    name="replacementOriginalFile"
+                    accept={ARTICLE_FILE_ACCEPT}
+                    required
+                    className="input"
+                  />
+                  <button type="submit" className="btn btn-warn">
+                    Replace Original File
+                  </button>
+                </Form>
+
+                <Form
+                  method="post"
+                  encType="multipart/form-data"
+                  className="list"
+                  onSubmit={(e) => {
+                    if (
+                      !confirm(
+                        "Replace the blinded review file for this version in storage?"
+                      )
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <input type="hidden" name="intent" value="replaceBlindFile" />
+                  <input
+                    type="file"
+                    name="replacementBlindFile"
+                    accept={ARTICLE_FILE_ACCEPT}
+                    required
+                    className="input"
+                  />
+                  <button type="submit" className="btn btn-warn">
+                    {version.blind_storage_path
+                      ? "Replace Blinded File"
+                      : "Add Blinded File"}
+                  </button>
+                </Form>
+              </div>
             </div>
           )}
 
-          <div className="row" style={{ gap: 10, marginTop: 12 }}>
-            <a
-              href={fileDownloadUrl}
-              className="btn btn-accent"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Download / View File
-            </a>
+          <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            {fileDownloadUrl && (
+              <a
+                href={fileDownloadUrl}
+                className="btn btn-accent"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Download / View {activeFileLabel}
+              </a>
+            )}
+            {copyrightDownloadUrl && copyrightFileName && (
+              <a
+                href={copyrightDownloadUrl}
+                className="btn btn-ghost"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Copyright Consent
+              </a>
+            )}
           </div>
 
-          {version.file_name.toLowerCase().endsWith(".pdf") && (
-            <div style={{ marginTop: 12 }}>
-              <iframe
-                src={fileViewUrl}
-                className="w-full"
-                style={{
-                  height: 520,
-                  border: `1px solid var(--border)`,
-                  borderRadius: 6,
-                }}
-                title="PDF Viewer"
-              />
-            </div>
-          )}
+          {fileViewUrl &&
+            activeFileName?.toLowerCase().endsWith(".pdf") && (
+              <div style={{ marginTop: 12 }}>
+                <iframe
+                  src={fileViewUrl}
+                  className="w-full"
+                  style={{
+                    height: 520,
+                    border: `1px solid var(--border)`,
+                    borderRadius: 6,
+                  }}
+                  title="PDF Viewer"
+                />
+              </div>
+            )}
         </div>
 
         <div className="section">
@@ -658,7 +793,7 @@ export default function VersionReview() {
               }}
               className="list"
               style={{ marginBottom: 12 }}
-              onSubmit={(e) => {
+              onSubmit={() => {
                 handledCommentSuccess.current = false;
               }}
             >
@@ -708,9 +843,7 @@ export default function VersionReview() {
                         className="text-xs py-0 px-1"
                       />
                     )}
-                    <span className="meta">
-                      {comment.formattedDate}
-                    </span>
+                    <span className="meta">{comment.formattedDate}</span>
                     {(user?.id === comment.author_id || isAdmin) && (
                       <div className="row" style={{ gap: 6 }}>
                         <commentFetcher.Form method="post">
@@ -807,9 +940,7 @@ export default function VersionReview() {
                                 className="text-xs py-0 px-1"
                               />
                             )}
-                            <span className="meta">
-                              {reply.formattedDate}
-                            </span>
+                            <span className="meta">{reply.formattedDate}</span>
                           </div>
                           <p className="muted" style={{ marginTop: 4 }}>
                             {reply.body}
@@ -832,7 +963,7 @@ export default function VersionReview() {
                             commentFormsRef.current.push(form);
                           }
                         }}
-                        onSubmit={(e) => {
+                        onSubmit={() => {
                           handledCommentSuccess.current = false;
                         }}
                       >

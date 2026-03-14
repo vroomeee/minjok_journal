@@ -9,6 +9,17 @@ import {
 } from "react-router";
 import type { Route } from "./+types/$paperId.edit";
 import { createSupabaseServerClient, requireUser } from "~/lib/supabase.server";
+import {
+  ARTICLE_FILE_ACCEPT,
+  getOptionalFormFile,
+  validateArticleUpload,
+} from "~/lib/article-files";
+import {
+  buildCopyrightArticlePath,
+  createSignedArticleUrl,
+  removeArticleFiles,
+  uploadArticleFile,
+} from "~/lib/article-files.server";
 import { Nav } from "~/components/nav";
 
 type SearchProfile = {
@@ -37,6 +48,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         description,
         author_id,
         status,
+        copyright_file_name,
+        copyright_storage_path,
         authors:article_authors(
           profile_id,
           position,
@@ -81,6 +94,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     },
     user,
     profile,
+    copyrightDownloadUrl:
+      paper.copyright_storage_path && paper.copyright_file_name
+        ? await createSignedArticleUrl(paper.copyright_storage_path, {
+            download: paper.copyright_file_name,
+          })
+        : null,
   };
 }
 
@@ -93,6 +112,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const title = ((formData.get("title") as string) || "").trim();
   const rawDescription = (formData.get("description") as string) || "";
   const description = rawDescription.trim() || null;
+  const copyrightFile = getOptionalFormFile(formData, "copyrightFile");
   const coauthorIds = Array.from(
     new Set(
       formData
@@ -106,9 +126,20 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: "Title is required" };
   }
 
+  const copyrightValidation = validateArticleUpload(
+    copyrightFile,
+    "Copyright consent",
+    { required: false },
+  );
+  if (copyrightValidation) {
+    return { error: copyrightValidation };
+  }
+
   const { data: paper } = await supabase
     .from("articles")
-    .select("id, author_id, authors:article_authors(profile_id, position)")
+    .select(
+      "id, author_id, copyright_storage_path, authors:article_authors(profile_id, position)",
+    )
     .eq("id", paperId)
     .single();
   if (!paper) throw new Response("Paper not found", { status: 404 });
@@ -200,20 +231,67 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
+  const newCopyrightPath =
+    copyrightFile && buildCopyrightArticlePath(paperId, copyrightFile.name);
+  if (copyrightFile && newCopyrightPath) {
+    try {
+      await uploadArticleFile(newCopyrightPath, copyrightFile);
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to upload copyright consent",
+      };
+    }
+  }
+
+  const articleUpdate: Record<string, string | number | null> = {
+    title,
+    description,
+    updated_at: new Date().toISOString(),
+  };
+  if (copyrightFile && newCopyrightPath) {
+    articleUpdate.copyright_storage_path = newCopyrightPath;
+    articleUpdate.copyright_file_name = copyrightFile.name;
+    articleUpdate.copyright_file_size = copyrightFile.size;
+    articleUpdate.copyright_uploaded_at = new Date().toISOString();
+  }
+
   const { error } = await supabase
     .from("articles")
-    .update({ title, description, updated_at: new Date().toISOString() })
+    .update(articleUpdate)
     .eq("id", paperId);
 
   if (error) {
+    if (newCopyrightPath) {
+      try {
+        await removeArticleFiles([newCopyrightPath]);
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
     return { error: "Failed to update paper" };
+  }
+
+  if (
+    newCopyrightPath &&
+    paper.copyright_storage_path &&
+    paper.copyright_storage_path !== newCopyrightPath
+  ) {
+    try {
+      await removeArticleFiles([paper.copyright_storage_path]);
+    } catch {
+      // Keep the paper updated even if old storage cleanup fails.
+    }
   }
 
   return redirect(`/papers/${paperId}`);
 }
 
 export default function EditPaper() {
-  const { paper, user, profile } = useLoaderData<typeof loader>();
+  const { paper, user, profile, copyrightDownloadUrl } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const searchFetcher = useFetcher<{ results: SearchProfile[] }>();
   const [query, setQuery] = useState("");
@@ -304,7 +382,7 @@ export default function EditPaper() {
             </div>
           )}
 
-          <Form method="post" className="list">
+          <Form method="post" encType="multipart/form-data" className="list">
             <div>
               <label className="label">Title</label>
               <input
@@ -324,6 +402,38 @@ export default function EditPaper() {
                 className="textarea"
                 placeholder="Short description for the published paper"
               />
+            </div>
+
+            <div className="section-compact subtle" style={{ gap: 8 }}>
+              <div>
+                <label className="label" style={{ marginBottom: 4 }}>
+                  Copyright Consent
+                </label>
+                <p className="muted text-sm" style={{ margin: 0 }}>
+                  {paper.copyright_file_name
+                    ? `Current file: ${paper.copyright_file_name}`
+                    : "No copyright consent uploaded yet."}
+                </p>
+              </div>
+              {copyrightDownloadUrl && paper.copyright_file_name && (
+                <a
+                  href={copyrightDownloadUrl}
+                  className="btn btn-ghost"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Download Current Consent
+                </a>
+              )}
+              <div>
+                <label className="label">Replace Copyright Consent</label>
+                <input
+                  type="file"
+                  name="copyrightFile"
+                  accept={ARTICLE_FILE_ACCEPT}
+                  className="input"
+                />
+              </div>
             </div>
 
             <div className="section-compact" style={{ gap: 10 }}>
