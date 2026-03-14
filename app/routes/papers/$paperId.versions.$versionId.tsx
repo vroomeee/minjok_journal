@@ -30,12 +30,13 @@ import {
 import {
   canAccessArticle,
   isArticleAuthor,
-  shouldUseBlindReviewFile,
+  shouldHideArticleIdentity,
 } from "~/lib/article-access";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
 import { useEffect, useRef } from "react";
 import { UserLink } from "~/components/user-link";
+import { cleanupIssuesAndVolumes } from "~/lib/issues";
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -111,20 +112,21 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Version not found", { status: 404 });
   }
 
-  const prefersBlindFile =
-    shouldUseBlindReviewFile(profile?.role_type) &&
-    Boolean(version.blind_storage_path);
-  const selectedPath = prefersBlindFile
+  const isBlindReviewContext = shouldHideArticleIdentity(
+    profile?.role_type,
+    paper.status,
+  );
+  const selectedPath = isBlindReviewContext
     ? version.blind_storage_path
     : version.storage_path;
-  const selectedFileName = prefersBlindFile
-    ? version.blind_file_name || version.file_name
+  const selectedFileName = isBlindReviewContext
+    ? version.blind_file_name
     : version.file_name;
-  const activeFileLabel = prefersBlindFile
+  const activeFileLabel = isBlindReviewContext
     ? "Blinded Review File"
     : "Original File";
-  const isBlindFallback =
-    shouldUseBlindReviewFile(profile?.role_type) && !version.blind_storage_path;
+  const isBlindFileMissing =
+    isBlindReviewContext && !version.blind_storage_path;
 
   let fileViewUrl: string | null = null;
   let fileDownloadUrl: string | null = null;
@@ -185,24 +187,36 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .select("id")
     .eq("article_id", paperId);
 
-  const formattedVersion = { ...version, formattedDate: formatDate(version.created_at) };
+  const formattedVersion = {
+    id: version.id,
+    version_number: version.version_number,
+    notes: isBlindReviewContext ? null : version.notes,
+    formattedDate: formatDate(version.created_at),
+    hasBlindFile: Boolean(version.blind_storage_path),
+  };
   const formattedComments = (comments || []).map((c) => ({
     ...c,
+    author: isBlindReviewContext ? null : c.author,
     formattedDate: formatDate(c.created_at),
   }));
   const formattedReplies = replies.map((r) => ({
     ...r,
+    author: isBlindReviewContext ? null : r.author,
     formattedDate: formatDate(r.created_at),
   }));
 
   return {
-    paper,
+    paper: {
+      ...paper,
+      author_id: isBlindReviewContext ? null : paper.author_id,
+      authors: isBlindReviewContext ? [] : paper.authors,
+    },
     version: formattedVersion,
     fileViewUrl,
     fileDownloadUrl,
     activeFileLabel,
     activeFileName: selectedFileName,
-    isBlindFallback,
+    isBlindFileMissing,
     comments: formattedComments,
     replies: formattedReplies,
     totalVersions: versionList?.length || 0,
@@ -278,16 +292,15 @@ export async function action({ request, params }: Route.ActionArgs) {
     ]);
 
     if (versions.length === 1) {
-      try {
-        await removeArticleFiles([...allPaths, paper.copyright_storage_path]);
-      } catch (error) {
-        return {
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to remove article files",
-        };
-      }
+      const { data: issueRows } = await supabase
+        .from("issue_articles")
+        .select("issue_id")
+        .eq("article_id", paperId);
+      const affectedIssues = Array.from(
+        new Set(
+          issueRows?.map((row) => row.issue_id).filter(Boolean) ?? [],
+        ),
+      );
 
       const { error: deleteArticleError } = await supabase
         .from("articles")
@@ -297,23 +310,20 @@ export async function action({ request, params }: Route.ActionArgs) {
         return { error: "Failed to delete paper" };
       }
 
+      await cleanupIssuesAndVolumes(supabase, affectedIssues);
+
+      try {
+        await removeArticleFiles([...allPaths, paper.copyright_storage_path]);
+      } catch (error) {
+        console.error("Failed to remove deleted article files:", error);
+      }
+
       return redirect("/papers");
     }
 
     const fallbackVersion = versions.find((v) => v.id !== versionId);
     if (!fallbackVersion) {
       return { error: "Could not determine fallback version" };
-    }
-
-    try {
-      await removeArticleFiles(targetPaths);
-    } catch (error) {
-      return {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to remove version files",
-      };
     }
 
     if (paper.current_version_id === versionId) {
@@ -331,6 +341,12 @@ export async function action({ request, params }: Route.ActionArgs) {
       .delete()
       .eq("id", versionId);
     if (deleteVersionError) return { error: "Failed to delete version" };
+
+    try {
+      await removeArticleFiles(targetPaths);
+    } catch (error) {
+      console.error("Failed to remove deleted version files:", error);
+    }
 
     return redirect(`/papers/${paperId}`);
   }
@@ -523,7 +539,7 @@ export default function VersionReview() {
     fileDownloadUrl,
     activeFileLabel,
     activeFileName,
-    isBlindFallback,
+    isBlindFileMissing,
     comments,
     replies,
     totalVersions,
@@ -564,6 +580,10 @@ export default function VersionReview() {
   const isAuthor = isArticleAuthor(paper, user?.id);
   const isPrimaryAuthor = paper?.author_id === user?.id;
   const canEditNotes = isAdmin || isAuthor;
+  const hideReviewerIdentity = shouldHideArticleIdentity(
+    profile?.role_type,
+    paper?.status,
+  );
   const canDeleteVersion =
     isAdmin ||
     (isPrimaryAuthor &&
@@ -621,7 +641,7 @@ export default function VersionReview() {
             style={{ gap: 12, flexWrap: "wrap", marginTop: 6 }}
           >
             <span className="meta">
-              {activeFileLabel}: {activeFileName}
+              {activeFileLabel}: {activeFileName || "Missing"}
             </span>
             {version.notes && (
               <span className="muted" style={{ fontStyle: "italic" }}>
@@ -629,10 +649,9 @@ export default function VersionReview() {
               </span>
             )}
           </div>
-          {isBlindFallback && (
+          {isBlindFileMissing && (
             <p className="muted" style={{ marginTop: 8 }}>
-              Blinded file is missing for this version, so the original file is
-              being shown.
+              A blinded file has not been uploaded for this version yet.
             </p>
           )}
 
@@ -730,7 +749,7 @@ export default function VersionReview() {
                     className="input"
                   />
                   <button type="submit" className="btn btn-warn">
-                    {version.blind_storage_path
+                    {version.hasBlindFile
                       ? "Replace Blinded File"
                       : "Add Blinded File"}
                   </button>
@@ -835,9 +854,13 @@ export default function VersionReview() {
                 >
                   <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
-                      <UserLink user={comment.author} />
+                      {hideReviewerIdentity ? (
+                        "Anonymous reviewer"
+                      ) : (
+                        <UserLink user={comment.author} />
+                      )}
                     </span>
-                    {comment.author && (
+                    {!hideReviewerIdentity && comment.author && (
                       <RoleBadge
                         role={comment.author.role_type}
                         className="text-xs py-0 px-1"
@@ -932,9 +955,13 @@ export default function VersionReview() {
                         >
                           <div className="row" style={{ gap: 6 }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>
-                              <UserLink user={reply.author} />
+                              {hideReviewerIdentity ? (
+                                "Anonymous reply"
+                              ) : (
+                                <UserLink user={reply.author} />
+                              )}
                             </span>
-                            {reply.author && (
+                            {!hideReviewerIdentity && reply.author && (
                               <RoleBadge
                                 role={reply.author.role_type}
                                 className="text-xs py-0 px-1"

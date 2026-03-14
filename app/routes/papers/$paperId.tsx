@@ -19,7 +19,11 @@ import {
   createSignedArticleUrls,
   removeArticleFiles,
 } from "~/lib/article-files.server";
-import { canAccessArticle, isArticleAuthor } from "~/lib/article-access";
+import {
+  canAccessArticle,
+  isArticleAuthor,
+  shouldHideArticleIdentity,
+} from "~/lib/article-access";
 import { isReviewRole } from "~/lib/roles";
 import { cleanupIssuesAndVolumes } from "~/lib/issues";
 import { Nav } from "~/components/nav";
@@ -148,7 +152,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     paper.versions?.find((v) => v.id === paper.current_version_id) ||
     paper.versions?.[0] ||
     null;
-  const publishedVersion = currentVersion;
+  const publishedVersion = paper.status === "published" ? currentVersion : null;
+  const hideArticleIdentity = shouldHideArticleIdentity(
+    profile?.role_type,
+    paper.status,
+  );
 
   let publishedFileViewUrl: string | null = null;
   let publishedFileDownloadUrl: string | null = null;
@@ -175,9 +183,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const formattedPaper = {
     ...paper,
+    author: hideArticleIdentity ? null : paper.author,
+    author_id: hideArticleIdentity ? null : paper.author_id,
+    authors: hideArticleIdentity ? [] : paper.authors,
     formattedDate: formatDate(paper.created_at),
     versions: paper.versions?.map((v) => ({
-      ...v,
+      id: v.id,
+      version_number: v.version_number,
+      created_at: v.created_at,
+      file_name: hideArticleIdentity
+        ? v.blind_storage_path
+          ? "Blinded review file available"
+          : "Blinded review file missing"
+        : v.file_name,
+      notes: hideArticleIdentity ? null : v.notes,
       formattedDate: formatDate(v.created_at),
     })),
   };
@@ -251,11 +270,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       ),
     );
 
-    // Remove from issue_articles first (cleanup junction table)
-    await supabase.from("issue_articles").delete().eq("article_id", paperId);
-    await cleanupIssuesAndVolumes(supabase, affectedIssues);
-
-    // Remove storage objects for all versions of this paper
     const { data: versionPaths } = await supabase
       .from("article_versions")
       .select("storage_path, blind_storage_path")
@@ -269,24 +283,18 @@ export async function action({ request, params }: Route.ActionArgs) {
       ),
       paper?.copyright_storage_path || null,
     ];
-    try {
-      await removeArticleFiles(pathsToRemove);
-    } catch (storageError) {
-      return {
-        error:
-          storageError instanceof Error
-            ? storageError.message
-            : "Failed to delete paper files",
-      };
-    }
-
-    const { error } = await supabase
-      .from("articles")
-      .delete()
-      .eq("id", paperId);
+    const { error } = await supabase.from("articles").delete().eq("id", paperId);
 
     if (error) {
       return { error: "Failed to delete paper" };
+    }
+
+    await cleanupIssuesAndVolumes(supabase, affectedIssues);
+
+    try {
+      await removeArticleFiles(pathsToRemove);
+    } catch (storageError) {
+      console.error("Failed to remove deleted paper files:", storageError);
     }
 
     return redirect("/papers");
@@ -549,6 +557,10 @@ export default function PaperDetail() {
   const canSubmitForReview = isPrimaryAuthor && paper.status === "draft";
   const showReadinessChecklist =
     paper.status !== "published" && (isAuthor || isAdmin || isReviewer);
+  const hideArticleIdentity = shouldHideArticleIdentity(
+    profile?.role_type,
+    paper.status,
+  );
   const showComments = paper.status === "published" && !!activeVersionId;
   const truncateNotes = (notes?: string | null) =>
     notes && notes.length > 200 ? `${notes.slice(0, 200)}...` : notes;
@@ -608,7 +620,11 @@ export default function PaperDetail() {
             className="row"
             style={{ flexWrap: "wrap", gap: 12, marginBottom: 8 }}
           >
-            <AuthorList authors={paper.authors} showBadges />
+            {hideArticleIdentity ? (
+              <span className="meta">Blinded submission</span>
+            ) : (
+              <AuthorList authors={paper.authors} showBadges />
+            )}
             <span className="meta">{paper.formattedDate}</span>
           </div>
           {paper.description && (
@@ -769,7 +785,7 @@ export default function PaperDetail() {
                           <p className="muted" style={{ margin: "2px 0" }}>
                             {version.file_name}
                           </p>
-                          {version.notes && (
+                          {!hideArticleIdentity && version.notes && (
                             <p className="muted" style={{ margin: "4px 0" }}>
                               {truncateNotes(version.notes)}
                             </p>

@@ -179,58 +179,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  const desiredAuthorIds = [paper.author_id, ...normalizedCoauthorIds];
-  const desiredAuthorSet = new Set(desiredAuthorIds);
-  const existingAuthors = (paper.authors || []) as { profile_id: string }[];
-  const existingAuthorSet = new Set(existingAuthors.map((a) => a.profile_id));
-
-  const toDeleteIds = existingAuthors
-    .map((a) => a.profile_id)
-    .filter((id) => !desiredAuthorSet.has(id) && id !== paper.author_id);
-
-  const toInsertIds = desiredAuthorIds.filter((id) => !existingAuthorSet.has(id));
-
-  if (toInsertIds.length > 0) {
-    const rows = toInsertIds.map((profile_id) => ({
-      article_id: paperId,
-      profile_id,
-      is_corresponding: profile_id === paper.author_id,
-      position: desiredAuthorIds.indexOf(profile_id),
-    }));
-    const { error: insertAuthorsError } = await supabase
-      .from("article_authors")
-      .insert(rows);
-    if (insertAuthorsError) {
-      return { error: `Failed to add coauthors: ${insertAuthorsError.message}` };
-    }
-  }
-
-  if (toDeleteIds.length > 0) {
-    const { error: deleteAuthorsError } = await supabase
-      .from("article_authors")
-      .delete()
-      .eq("article_id", paperId)
-      .in("profile_id", toDeleteIds);
-    if (deleteAuthorsError) {
-      return { error: `Failed to remove coauthors: ${deleteAuthorsError.message}` };
-    }
-  }
-
-  for (let idx = 0; idx < desiredAuthorIds.length; idx += 1) {
-    const profileId = desiredAuthorIds[idx];
-    const { error: reorderError } = await supabase
-      .from("article_authors")
-      .update({
-        position: idx,
-        is_corresponding: profileId === paper.author_id,
-      })
-      .eq("article_id", paperId)
-      .eq("profile_id", profileId);
-    if (reorderError) {
-      return { error: `Failed to reorder authors: ${reorderError.message}` };
-    }
-  }
-
   const newCopyrightPath =
     copyrightFile && buildCopyrightArticlePath(paperId, copyrightFile.name);
   if (copyrightFile && newCopyrightPath) {
@@ -246,22 +194,16 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  const articleUpdate: Record<string, string | number | null> = {
-    title,
-    description,
-    updated_at: new Date().toISOString(),
-  };
-  if (copyrightFile && newCopyrightPath) {
-    articleUpdate.copyright_storage_path = newCopyrightPath;
-    articleUpdate.copyright_file_name = copyrightFile.name;
-    articleUpdate.copyright_file_size = copyrightFile.size;
-    articleUpdate.copyright_uploaded_at = new Date().toISOString();
-  }
-
-  const { error } = await supabase
-    .from("articles")
-    .update(articleUpdate)
-    .eq("id", paperId);
+  const { error } = await supabase.rpc("update_article_details_and_authors", {
+    p_article_id: paperId,
+    p_title: title,
+    p_description: description,
+    p_copyright_storage_path: newCopyrightPath ?? null,
+    p_copyright_file_name: copyrightFile?.name ?? null,
+    p_copyright_file_size: copyrightFile?.size ?? null,
+    p_copyright_uploaded_at: newCopyrightPath ? new Date().toISOString() : null,
+    p_coauthor_ids: normalizedCoauthorIds,
+  });
 
   if (error) {
     if (newCopyrightPath) {

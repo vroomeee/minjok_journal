@@ -2,6 +2,7 @@ import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/review";
 import { createSupabaseServerClient, getUserAndProfile } from "~/lib/supabase.server";
 import { createSignedArticleUrl } from "~/lib/article-files.server";
+import { shouldHideArticleIdentity } from "~/lib/article-access";
 import { isReviewRole } from "~/lib/roles";
 import { Nav } from "~/components/nav";
 import { RoleBadge } from "~/components/role-badge";
@@ -58,6 +59,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const formattedPapers = await Promise.all(
     (papers || []).map(async (paper) => {
+      const isBlindReviewContext = shouldHideArticleIdentity(
+        profile.role_type,
+        paper.status,
+      );
       const copyrightDownloadUrl =
         paper.copyright_storage_path && paper.copyright_file_name
           ? await createSignedArticleUrl(paper.copyright_storage_path, {
@@ -70,19 +75,28 @@ export async function loader({ request }: Route.LoaderArgs) {
           : "Review Original File";
       const hasReviewFile =
         profile.role_type === "prof"
-          ? Boolean(
-              paper.current_version?.blind_storage_path ||
-                paper.current_version?.storage_path,
-            )
+          ? Boolean(paper.current_version?.blind_storage_path)
           : Boolean(paper.current_version?.storage_path);
 
       return {
-        ...paper,
+        id: paper.id,
+        title: paper.title,
+        status: paper.status,
+        updated_at: paper.updated_at,
+        authors: isBlindReviewContext ? [] : paper.authors,
+        current_version: paper.current_version
+          ? {
+              id: paper.current_version.id,
+              version_number: paper.current_version.version_number,
+              created_at: paper.current_version.created_at,
+            }
+          : null,
         formattedDate: formatDate(paper.updated_at),
         reviewLabel,
         hasReviewFile,
         hasCopyrightConsent: Boolean(paper.copyright_storage_path),
         copyrightDownloadUrl,
+        isBlindReviewContext,
       };
     }),
   );
@@ -139,9 +153,18 @@ export default function ReviewQueue() {
                       </h3>
                     </Link>
                     <div className="row" style={{ gap: 8, marginTop: 4 }}>
-                      <AuthorList authors={paper.authors} />
-                      {paper.authors?.[0]?.profile?.role_type && (
-                        <RoleBadge role={paper.authors[0].profile.role_type} />
+                      {!paper.isBlindReviewContext && (
+                        <>
+                          <AuthorList authors={paper.authors} />
+                          {paper.authors?.[0]?.profile?.role_type && (
+                            <RoleBadge role={paper.authors[0].profile.role_type} />
+                          )}
+                        </>
+                      )}
+                      {paper.isBlindReviewContext && (
+                        <span className="muted" style={{ fontSize: 13 }}>
+                          Blinded submission
+                        </span>
                       )}
                       <span className="muted" style={{ fontSize: 13 }}>
                         Submitted: {paper.formattedDate}

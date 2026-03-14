@@ -574,7 +574,24 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      can_access_article_for_user: {
+        Args: { p_article_id: string; p_user_id: string | null };
+        Returns: boolean;
+      };
       is_admin: { Args: never; Returns: boolean };
+      update_article_details_and_authors: {
+        Args: {
+          p_article_id: string;
+          p_coauthor_ids: string[] | null;
+          p_copyright_file_name: string | null;
+          p_copyright_file_size: number | null;
+          p_copyright_storage_path: string | null;
+          p_copyright_uploaded_at: string | null;
+          p_description: string | null;
+          p_title: string;
+        };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;

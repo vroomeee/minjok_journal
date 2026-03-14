@@ -1,7 +1,7 @@
 import { isReviewRole } from "./roles";
 
 type ArticleAccessShape = {
-  author_id: string;
+  author_id: string | null;
   status?: string | null;
   authors?: Array<{ profile_id: string }> | null;
 };
@@ -39,4 +39,11 @@ export function canAccessArticle(
 
 export function shouldUseBlindReviewFile(roleType: string | null | undefined) {
   return roleType === "prof";
+}
+
+export function shouldHideArticleIdentity(
+  roleType: string | null | undefined,
+  articleStatus: string | null | undefined,
+) {
+  return shouldUseBlindReviewFile(roleType) && articleStatus !== "published";
 }
