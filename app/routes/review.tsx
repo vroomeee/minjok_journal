@@ -1,7 +1,11 @@
 import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/review";
 import { createSupabaseServerClient, getUserAndProfile } from "~/lib/supabase.server";
-import { createSignedArticleUrl } from "~/lib/article-files.server";
+import {
+  ARTICLE_FILE_SERVICE_ERROR,
+  isArticleFileServiceConfigured,
+  tryCreateSignedArticleUrl,
+} from "~/lib/article-files.server";
 import { shouldHideArticleIdentity } from "~/lib/article-access";
 import { isReviewRole } from "~/lib/roles";
 import { Nav } from "~/components/nav";
@@ -28,6 +32,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!user || !profile || !isReviewRole(profile.role_type)) {
     return redirect("/");
   }
+
+  const isArticleFileServiceReady = isArticleFileServiceConfigured();
 
   const { data: papers } = await supabase
     .from("articles")
@@ -65,7 +71,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       );
       const copyrightDownloadUrl =
         paper.copyright_storage_path && paper.copyright_file_name
-          ? await createSignedArticleUrl(paper.copyright_storage_path, {
+          ? await tryCreateSignedArticleUrl(paper.copyright_storage_path, {
               download: paper.copyright_file_name,
             })
           : null;
@@ -97,6 +103,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         hasCopyrightConsent: Boolean(paper.copyright_storage_path),
         copyrightDownloadUrl,
         isBlindReviewContext,
+        fileAccessError: isArticleFileServiceReady ? null : ARTICLE_FILE_SERVICE_ERROR,
       };
     }),
   );
@@ -199,6 +206,11 @@ export default function ReviewQueue() {
                           </span>
                         )}
                       </div>
+                    )}
+                    {paper.fileAccessError && (
+                      <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                        {paper.fileAccessError}
+                      </p>
                     )}
                   </div>
                   <span className="pill" style={{ background: "#2f2a17" }}>

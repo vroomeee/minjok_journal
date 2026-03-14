@@ -4,6 +4,8 @@ import { MAX_ARTICLE_FILE_SIZE } from "./article-files";
 
 export const ARTICLE_FILES_BUCKET = "articles";
 const ARTICLE_SIGNED_URL_EXPIRES_IN = 60 * 10; // 10 minutes
+export const ARTICLE_FILE_SERVICE_ERROR =
+  "Article file access is not configured on the server.";
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[\\/]/g, "_");
@@ -18,6 +20,10 @@ function requireArticleAdminClient() {
   }
 
   return adminClient.supabase;
+}
+
+export function isArticleFileServiceConfigured() {
+  return Boolean(createSupabaseAdminClient());
 }
 
 export function buildOriginalArticlePath(
@@ -106,4 +112,26 @@ export async function createSignedArticleUrls(path: string, fileName: string) {
   ]);
 
   return { viewUrl, downloadUrl };
+}
+
+export async function tryCreateSignedArticleUrl(
+  path: string,
+  options?: {
+    download?: string | boolean;
+    expiresIn?: number;
+  },
+) {
+  if (!isArticleFileServiceConfigured()) {
+    return null;
+  }
+
+  return createSignedArticleUrl(path, options);
+}
+
+export async function tryCreateSignedArticleUrls(path: string, fileName: string) {
+  if (!isArticleFileServiceConfigured()) {
+    return null;
+  }
+
+  return createSignedArticleUrls(path, fileName);
 }

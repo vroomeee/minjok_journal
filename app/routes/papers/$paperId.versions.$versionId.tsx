@@ -20,11 +20,13 @@ import {
   validateArticleUpload,
 } from "~/lib/article-files";
 import {
+  ARTICLE_FILE_SERVICE_ERROR,
   buildBlindArticlePath,
   buildOriginalArticlePath,
-  createSignedArticleUrl,
-  createSignedArticleUrls,
+  isArticleFileServiceConfigured,
   removeArticleFiles,
+  tryCreateSignedArticleUrl,
+  tryCreateSignedArticleUrls,
   uploadArticleFile,
 } from "~/lib/article-files.server";
 import {
@@ -116,6 +118,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     profile?.role_type,
     paper.status,
   );
+  const isArticleFileServiceReady = isArticleFileServiceConfigured();
   const selectedPath = isBlindReviewContext
     ? version.blind_storage_path
     : version.storage_path;
@@ -131,14 +134,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   let fileViewUrl: string | null = null;
   let fileDownloadUrl: string | null = null;
   if (selectedPath && selectedFileName) {
-    const urls = await createSignedArticleUrls(selectedPath, selectedFileName);
-    fileViewUrl = urls.viewUrl;
-    fileDownloadUrl = urls.downloadUrl;
+    const urls = await tryCreateSignedArticleUrls(selectedPath, selectedFileName);
+    fileViewUrl = urls?.viewUrl || null;
+    fileDownloadUrl = urls?.downloadUrl || null;
   }
 
   const copyrightDownloadUrl =
     paper.copyright_storage_path && paper.copyright_file_name
-      ? await createSignedArticleUrl(paper.copyright_storage_path, {
+      ? await tryCreateSignedArticleUrl(paper.copyright_storage_path, {
           download: paper.copyright_file_name,
         })
       : null;
@@ -222,6 +225,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     totalVersions: versionList?.length || 0,
     copyrightDownloadUrl,
     copyrightFileName: paper.copyright_file_name,
+    articleFileAccessError: isArticleFileServiceReady
+      ? null
+      : ARTICLE_FILE_SERVICE_ERROR,
   };
 }
 
@@ -545,6 +551,7 @@ export default function VersionReview() {
     totalVersions,
     copyrightDownloadUrl,
     copyrightFileName,
+    articleFileAccessError,
   } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as
     | { user?: { id: string }; profile?: { role_type?: string | null } }
@@ -780,6 +787,11 @@ export default function VersionReview() {
               </a>
             )}
           </div>
+          {articleFileAccessError && (
+            <p className="muted" style={{ marginTop: 10 }}>
+              {articleFileAccessError}
+            </p>
+          )}
 
           {fileViewUrl &&
             activeFileName?.toLowerCase().endsWith(".pdf") && (

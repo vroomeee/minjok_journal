@@ -16,8 +16,10 @@ import {
   getUserProfile,
 } from "~/lib/supabase.server";
 import {
-  createSignedArticleUrls,
+  ARTICLE_FILE_SERVICE_ERROR,
+  isArticleFileServiceConfigured,
   removeArticleFiles,
+  tryCreateSignedArticleUrls,
 } from "~/lib/article-files.server";
 import {
   canAccessArticle,
@@ -157,16 +159,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     profile?.role_type,
     paper.status,
   );
+  const isArticleFileServiceReady = isArticleFileServiceConfigured();
 
   let publishedFileViewUrl: string | null = null;
   let publishedFileDownloadUrl: string | null = null;
   if (paper.status === "published" && publishedVersion?.storage_path) {
-    const urls = await createSignedArticleUrls(
+    const urls = await tryCreateSignedArticleUrls(
       publishedVersion.storage_path,
       publishedVersion.file_name,
     );
-    publishedFileViewUrl = urls.viewUrl;
-    publishedFileDownloadUrl = urls.downloadUrl;
+    publishedFileViewUrl = urls?.viewUrl || null;
+    publishedFileDownloadUrl = urls?.downloadUrl || null;
   }
 
   const reviewRequirements: ReviewRequirementState = {
@@ -212,6 +215,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     publishedVersion,
     publishedFileViewUrl,
     publishedFileDownloadUrl,
+    articleFileAccessError: isArticleFileServiceReady
+      ? null
+      : ARTICLE_FILE_SERVICE_ERROR,
     reviewRequirements,
   };
 }
@@ -511,6 +517,7 @@ export default function PaperDetail() {
     publishedVersion,
     publishedFileViewUrl,
     publishedFileDownloadUrl,
+    articleFileAccessError,
     reviewRequirements,
   } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as {
@@ -829,6 +836,11 @@ export default function PaperDetail() {
                 </a>
               )}
             </div>
+            {articleFileAccessError && (
+              <p className="muted" style={{ marginTop: 10 }}>
+                {articleFileAccessError}
+              </p>
+            )}
             {publishedFileViewUrl &&
               publishedVersion.file_name.toLowerCase().endsWith(".pdf") && (
                 <div style={{ marginTop: 12 }}>

@@ -15,9 +15,11 @@ import {
   validateArticleUpload,
 } from "~/lib/article-files";
 import {
+  ARTICLE_FILE_SERVICE_ERROR,
   buildCopyrightArticlePath,
-  createSignedArticleUrl,
+  isArticleFileServiceConfigured,
   removeArticleFiles,
+  tryCreateSignedArticleUrl,
   uploadArticleFile,
 } from "~/lib/article-files.server";
 import { Nav } from "~/components/nav";
@@ -87,6 +89,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Only the submitter or an admin can edit this paper", { status: 403 });
   }
 
+  const isArticleFileServiceReady = isArticleFileServiceConfigured();
+
   return {
     paper: {
       ...paper,
@@ -96,10 +100,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     profile,
     copyrightDownloadUrl:
       paper.copyright_storage_path && paper.copyright_file_name
-        ? await createSignedArticleUrl(paper.copyright_storage_path, {
+        ? await tryCreateSignedArticleUrl(paper.copyright_storage_path, {
             download: paper.copyright_file_name,
           })
         : null,
+    articleFileAccessError: isArticleFileServiceReady
+      ? null
+      : ARTICLE_FILE_SERVICE_ERROR,
   };
 }
 
@@ -232,7 +239,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function EditPaper() {
-  const { paper, user, profile, copyrightDownloadUrl } =
+  const { paper, user, profile, copyrightDownloadUrl, articleFileAccessError } =
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const searchFetcher = useFetcher<{ results: SearchProfile[] }>();
@@ -366,6 +373,11 @@ export default function EditPaper() {
                 >
                   Download Current Consent
                 </a>
+              )}
+              {articleFileAccessError && (
+                <p className="muted text-sm" style={{ margin: 0 }}>
+                  {articleFileAccessError}
+                </p>
               )}
               <div>
                 <label className="label">Replace Copyright Consent</label>
