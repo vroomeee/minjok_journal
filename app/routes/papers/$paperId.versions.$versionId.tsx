@@ -766,14 +766,24 @@ export default function VersionReview() {
           )}
 
           <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-            {fileDownloadUrl && (
+            {fileViewUrl && (
               <a
-                href={fileDownloadUrl}
+                href={fileViewUrl}
                 className="btn btn-accent"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Download / View {activeFileLabel}
+                Open {activeFileLabel}
+              </a>
+            )}
+            {fileDownloadUrl && (
+              <a
+                href={fileDownloadUrl}
+                className="btn btn-ghost"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Download {activeFileLabel}
               </a>
             )}
             {copyrightDownloadUrl && copyrightFileName && (

@@ -825,16 +825,28 @@ export default function PaperDetail() {
                   {publishedVersion.version_number})
                 </p>
               </div>
-              {publishedFileDownloadUrl && (
-                <a
-                  href={publishedFileDownloadUrl}
-                  className="btn btn-ghost"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Download
-                </a>
-              )}
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                {publishedFileViewUrl && (
+                  <a
+                    href={publishedFileViewUrl}
+                    className="btn btn-accent"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open
+                  </a>
+                )}
+                {publishedFileDownloadUrl && (
+                  <a
+                    href={publishedFileDownloadUrl}
+                    className="btn btn-ghost"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Download
+                  </a>
+                )}
+              </div>
             </div>
             {articleFileAccessError && (
               <p className="muted" style={{ marginTop: 10 }}>
