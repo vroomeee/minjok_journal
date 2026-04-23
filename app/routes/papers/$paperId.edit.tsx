@@ -136,7 +136,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const copyrightValidation = validateArticleUpload(
     copyrightFile,
     "Copyright consent",
-    { required: false },
+    { required: false, namePolicy: "multilingual" },
   );
   if (copyrightValidation) {
     return { error: copyrightValidation };

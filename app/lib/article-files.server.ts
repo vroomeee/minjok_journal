@@ -1,14 +1,23 @@
 import { createSupabaseAdminClient } from "./supabase.server";
 import { collectStorageObjectPaths } from "./storage";
-import { MAX_ARTICLE_FILE_SIZE } from "./article-files";
+import { getLowerCaseFileExtension } from "./file-names";
 
 export const ARTICLE_FILES_BUCKET = "articles";
 const ARTICLE_SIGNED_URL_EXPIRES_IN = 60 * 10; // 10 minutes
 export const ARTICLE_FILE_SERVICE_ERROR =
   "Article file access is not configured on the server.";
 
-function sanitizeFileName(fileName: string) {
-  return fileName.replace(/[\\/]/g, "_");
+function createArticleFileToken() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createStorageSafeArticleFileName(fileName: string) {
+  const extension = getLowerCaseFileExtension(fileName);
+  return `${createArticleFileToken()}${extension}`;
 }
 
 function requireArticleAdminClient() {
@@ -31,7 +40,7 @@ export function buildOriginalArticlePath(
   versionNumber: number,
   fileName: string,
 ) {
-  return `${articleId}/versions/v${versionNumber}/original/${Date.now()}-${sanitizeFileName(fileName)}`;
+  return `${articleId}/versions/v${versionNumber}/original/${Date.now()}-${createStorageSafeArticleFileName(fileName)}`;
 }
 
 export function buildBlindArticlePath(
@@ -39,11 +48,11 @@ export function buildBlindArticlePath(
   versionNumber: number,
   fileName: string,
 ) {
-  return `${articleId}/versions/v${versionNumber}/blind/${Date.now()}-${sanitizeFileName(fileName)}`;
+  return `${articleId}/versions/v${versionNumber}/blind/${Date.now()}-${createStorageSafeArticleFileName(fileName)}`;
 }
 
 export function buildCopyrightArticlePath(articleId: string, fileName: string) {
-  return `${articleId}/article/copyright/${Date.now()}-${sanitizeFileName(fileName)}`;
+  return `${articleId}/article/copyright/${Date.now()}-${createStorageSafeArticleFileName(fileName)}`;
 }
 
 export async function uploadArticleFile(path: string, file: File) {
