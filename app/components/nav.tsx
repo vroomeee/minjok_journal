@@ -48,6 +48,9 @@ export function Nav({ user, profile }: NavProps) {
             <Link to="/about" className="nav-link" prefetch="intent">
               About
             </Link>
+            <a href="/mic-2026/" className="nav-link">
+              MIC 2026
+            </a>
             {isAdmin && (
               <Link to="/admin" className="nav-link" prefetch="intent">
                 Admin
