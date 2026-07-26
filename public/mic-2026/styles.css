@@ -598,6 +598,11 @@ a:focus-visible, button:focus-visible, iframe:focus-visible {
   gap: var(--space-3);
 }
 
+.booth-grid-single {
+  max-width: 320px;
+  margin: 0 auto;
+}
+
 .booth-card { position: relative; }
 
 .booth-open {
