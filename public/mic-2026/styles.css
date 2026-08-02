@@ -634,6 +634,7 @@ a:focus-visible, button:focus-visible, iframe:focus-visible {
 }
 .booth-thumb svg { width: 46%; }
 .booth-thumb rect:first-child { fill: none; stroke: var(--color-border); stroke-width: 1.5; }
+.booth-thumb-img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
 
 .booth-body { padding: var(--space-2) var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: 6px; }
 .booth-tag {
@@ -721,6 +722,8 @@ a:focus-visible, button:focus-visible, iframe:focus-visible {
 }
 .modal-thumb svg { width: 32%; }
 .modal-thumb rect:first-child { fill: none; stroke: var(--color-border); stroke-width: 1.5; }
+.modal-thumb-img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
+.modal-thumb-link { display: block; width: 100%; height: 100%; }
 
 .modal-body { padding: var(--space-4); }
 .modal-body h3 { font-size: 22px; margin: 10px 0 6px; }

@@ -151,8 +151,25 @@
         modalAuthors.textContent = btn.getAttribute('data-authors') || '';
         modalSchool.textContent = btn.getAttribute('data-school') || '';
         modalAbstract.textContent = btn.getAttribute('data-abstract') || '';
-        var srcThumb = btn.querySelector('.booth-thumb svg');
-        modalThumb.innerHTML = srcThumb ? srcThumb.outerHTML : '';
+        var posterFull = btn.getAttribute('data-poster');
+        if (posterFull) {
+          var link = document.createElement('a');
+          link.className = 'modal-thumb-link';
+          link.href = posterFull;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.setAttribute('aria-label', 'Open full poster image in a new tab');
+          var img = document.createElement('img');
+          img.className = 'modal-thumb-img';
+          img.src = posterFull;
+          img.alt = (btn.getAttribute('data-title') || 'Poster') + ' — full poster';
+          link.appendChild(img);
+          modalThumb.innerHTML = '';
+          modalThumb.appendChild(link);
+        } else {
+          var srcThumb = btn.querySelector('.booth-thumb svg');
+          modalThumb.innerHTML = srcThumb ? srcThumb.outerHTML : '';
+        }
         boothModal.showModal();
       });
     });
