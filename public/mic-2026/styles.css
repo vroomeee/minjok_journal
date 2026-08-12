@@ -713,6 +713,16 @@ a:focus-visible, button:focus-visible, iframe:focus-visible {
   border: 0;
 }
 
+.modal-abstract-note {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-fg-muted);
+  font-style: italic;
+}
+
 .modal-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .modal-booth-num {
   align-self: flex-start;
@@ -906,4 +916,84 @@ a:focus-visible, button:focus-visible, iframe:focus-visible {
 
 @media (min-width: 720px) {
   .hero-desc { font-size: 18px; }
+}
+
+/* ---- Guest speaker ---- */
+.speaker-card {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-3);
+}
+.speaker-avatar {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: #fff;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.speaker-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.speaker-eyebrow {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  background: rgba(29,78,216,0.1);
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 2px;
+}
+.speaker-name { font-family: var(--font-serif); font-size: 22px; font-weight: 600; margin: 0; color: var(--color-fg); }
+.speaker-affil { margin: 0; font-size: 14.5px; color: var(--color-fg-muted); }
+.speaker-talk-label {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+.speaker-talk { margin: 2px 0 0; font-size: 16px; line-height: 1.45; color: var(--color-fg); }
+
+@media (max-width: 560px) {
+  .speaker-card { flex-direction: column; align-items: center; text-align: center; }
+  .speaker-body { align-items: center; }
+  .speaker-eyebrow { align-self: center; }
+}
+
+.speaker-parallel {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--color-fg-muted);
+  font-style: italic;
+}
+.timeline-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-style: normal;
+  color: var(--color-accent);
+  background: rgba(29,78,216,0.1);
+  padding: 2px 8px;
+  border-radius: 999px;
 }

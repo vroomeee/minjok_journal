@@ -140,6 +140,7 @@
     var modalAuthors = document.getElementById('booth-modal-authors');
     var modalSchool = document.getElementById('booth-modal-school');
     var modalAbstract = document.getElementById('booth-modal-abstract');
+    var modalAbstractNote = document.getElementById('booth-modal-abstract-note');
     var modalClose = boothModal.querySelector('[data-modal-close]');
 
     document.querySelectorAll('.booth-open').forEach(function (btn) {
@@ -156,7 +157,20 @@
         modalTitle.textContent = btn.getAttribute('data-title') || '';
         modalAuthors.textContent = btn.getAttribute('data-authors') || '';
         modalSchool.textContent = btn.getAttribute('data-school') || '';
-        modalAbstract.textContent = btn.getAttribute('data-abstract') || '';
+        var abstractText = btn.getAttribute('data-abstract') || '';
+        modalAbstract.textContent = abstractText;
+        modalAbstract.hidden = !abstractText;
+        if (modalAbstractNote) {
+          var src = btn.getAttribute('data-abstract-source');
+          var note = '';
+          if (!abstractText) {
+            note = 'No abstract has been submitted for this poster yet. Open the full poster above to read the research.';
+          } else if (src === 'excerpt') {
+            note = 'Quoted verbatim from the ' + (btn.getAttribute('data-abstract-section') || 'poster') + ' of the presenter\u2019s poster.';
+          }
+          modalAbstractNote.textContent = note;
+          modalAbstractNote.hidden = !note;
+        }
         var posterFull = btn.getAttribute('data-poster');
         var posterWebp = btn.getAttribute('data-poster-webp');
         var posterPrev = btn.getAttribute('data-poster-thumb');
