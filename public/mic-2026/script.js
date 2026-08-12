@@ -152,6 +152,8 @@
         modalSchool.textContent = btn.getAttribute('data-school') || '';
         modalAbstract.textContent = btn.getAttribute('data-abstract') || '';
         var posterFull = btn.getAttribute('data-poster');
+        var posterWebp = btn.getAttribute('data-poster-webp');
+        var posterPrev = btn.getAttribute('data-poster-thumb');
         if (posterFull) {
           var link = document.createElement('a');
           link.className = 'modal-thumb-link';
@@ -161,8 +163,26 @@
           link.setAttribute('aria-label', 'Open full poster image in a new tab');
           var img = document.createElement('img');
           img.className = 'modal-thumb-img';
-          img.src = posterFull;
           img.alt = (btn.getAttribute('data-title') || 'Poster') + ' — full poster';
+          // Show the grid thumbnail immediately (already cached, so it paints
+          // instantly), then swap in the full poster once it has downloaded.
+          if (posterPrev) {
+            img.src = posterPrev;
+            img.classList.add('is-loading');
+            var full = new Image();
+            full.onload = function () {
+              img.src = full.src;
+              img.classList.remove('is-loading');
+            };
+            full.onerror = function () {
+              // WebP unsupported or missing — fall back to the JPEG.
+              if (full.src.indexOf(posterFull) === -1) { full.src = posterFull; return; }
+              img.classList.remove('is-loading');
+            };
+            full.src = posterWebp || posterFull;
+          } else {
+            img.src = posterFull;
+          }
           link.appendChild(img);
           modalThumb.innerHTML = '';
           modalThumb.appendChild(link);
